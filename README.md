@@ -26,6 +26,19 @@ pip install -r requirements.txt .
 
 ## Inference
 
+The checkpoint of model should be placed at: 'PyramidKV/ckpt'
+
+
+```markdown
+PyramidKV
+    |- Pyramidkv
+    |- data
+    |- ckpt
+        |- Llama-3-8B-Instruct
+    |- ...
+```
+
+
 We support inference code on 'LongBench' to repuduce our result.
 
 Please refer to 'scripts/scripts_longBench/eval.sh' to modify the parameters according to your requirements.
