@@ -4,7 +4,7 @@
 Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression based on Pyramidal Information Funneling](https://arxiv.org/pdf/2406.02069)".
 
 <p align="center">
-    <img src="figs/PyramidKV.png" width="90%"> <br>
+    <img src="figs/PyramidKV.png" width="100%"> <br>
 </p>
 
 ## Performence
@@ -14,7 +14,14 @@ Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression base
 </p>
 
 
-## Requirements & Installation
+## Requirements
+
+```python
+transformers==4.37
+flash-attn==2.4.0
+```
+
+##  Installation
 
 ```python
 
@@ -26,7 +33,7 @@ pip install -r requirements.txt .
 
 ## Inference
 
-The checkpoint of model should be placed at: 'PyramidKV/ckpt'
+The checkpoint of model should be placed at: `PyramidKV/ckpt`
 
 
 ```markdown
@@ -39,9 +46,9 @@ PyramidKV
 ```
 
 
-We support inference code on 'LongBench' to repuduce our result.
+We support inference code on `LongBench` to repuduce our result.
 
-Please refer to 'scripts/scripts_longBench/eval.sh' to modify the parameters according to your requirements.
+Please refer to `scripts/scripts_longBench/eval.sh` to modify the parameters according to your requirements.
 
 * CUDA_VISIBLE_DEVICES: LLaMA3 inference support on single GPU.
 
@@ -63,6 +70,7 @@ Please refer to 'scripts/scripts_longBench/eval.sh' to modify the parameters acc
 sh scripts/scripts_longBench/eval.sh
 
 ```
+
 
 ## Citation
 
