@@ -50,20 +50,25 @@ We support inference code on `LongBench` to repuduce our result.
 
 Please refer to `scripts/scripts_longBench/eval.sh` to modify the parameters according to your requirements.
 
+```bash
+export CUDA_VISIBLE_DEVICES=0
+python3 ${base_dir}/run.py \
+    --base_dir ${base_dir} \
+    --method ${method} \
+    --model_name ${model_name} \
+    --max_capacity_prompts ${max_capacity_prompts} \
+    --save_dir ${save_dir} \
+    --use_cache True
+```
+
 * CUDA_VISIBLE_DEVICES: LLaMA3 inference support on single GPU.
-
 * base_dir: Set it to the path of PyramidKV. (e.g. /home/PyramidKV)
-
 * model_name: Support "Llama-3-8B-Instruct"
-
 * method: Support "PyramidKV"
-
 * max_capacity_prompts: Selected KV Size in each layer. （e.g. 128, 2048 in paper）. When method is "PyramidKV", given that the total number of KV remains unchanged, the specific KV length for each layer will be modified accordingly
-
 * save_dir: Path to your dir to save LongBench result.
 
-
-
+After modifying parameters, run:
 
 ```bash 
 
@@ -90,4 +95,4 @@ If you find **PyramidKV** useful for your research and applications, please kind
 ## Acknowledgement
 
 
-Thanks **[SnapKV]** [SnapKV: LLM Knows What You are Looking for Before Generation](https://github.com/FasterDecoding/SnapKV) for providing open-source code to support the expansion of this project's code.
+Thanks **[SnapKV]** [SnapKV: LLM Knows What You are Looking for Before Generation](https://github.com/FasterDecoding/SnapKV) for providing open-source code to support the expansion of this project.
