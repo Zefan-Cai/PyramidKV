@@ -10,8 +10,21 @@ Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression base
 ## Performence
 
 <p align="center">
-    <img src="figs/Result.png" width="90%"> <br>
+    <img src="figs/Result.png" width="100%"> <br>
 </p>
+
+## Visualization: Inefficient Attention 
+
+The Llama model attention map with 3 documents is represented as follows:
+
+<p align="center">
+    <img src="figs/attention_pattern.png" width="100%"> <br>
+</p>
+
+we provide a notebook `visualization.ipynb` to reproduce the visualization result of each Llama-2-7b-hf model layer for a given 3 document.
+
+Model attention maps for different layers would be stored at "./output_example"
+
 
 
 ## Requirements

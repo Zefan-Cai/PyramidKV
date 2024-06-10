@@ -50,7 +50,7 @@ from transformers.utils import (
 )
 from transformers.utils.import_utils import is_torch_fx_available
 from transformers.models.llama.configuration_llama import LlamaConfig
-from Pyramidkv_utils import KVCluster_pyramid
+from pyramidkv_utils import KVCluster_pyramid
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_func, flash_attn_varlen_func

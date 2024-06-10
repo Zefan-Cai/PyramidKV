@@ -1,11 +1,7 @@
 
-base_dir=$1
-mode_name=$2
-results_dir=$3
-# /home/caizf/projects/Attention
-# /mnt/users/v-caizefan/Attention
+model_path=""
+results_dir=""
 
-
-python3 ${base_dir}/PyramidQA/eval_ssp.py \
-    --model_name ${mode_name} \
+python3 eval.py \
+    --model_path ${model_path} \
     --results_dir ${results_dir}
