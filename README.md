@@ -29,7 +29,7 @@ The Llama model attention map with 3 documents is represented as follows:
 
 we provide a notebook `visualization.ipynb` to reproduce the visualization result of each Llama-2-7b-hf model layer for a given 3 document.
 
-Model attention maps for different layers would be stored at "./output_example"
+Model attention maps for different layers would be stored at `./attention`
 
 
 
