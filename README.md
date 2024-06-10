@@ -7,6 +7,12 @@ Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression base
     <img src="figs/PyramidKV.png" width="100%"> <br>
 </p>
 
+## TODO:
+
+- [ ] Support implementation of Streaming LLM, H2O and SnapKV
+
+- [ ] Support LLama2 and Mistral model
+
 ## Performence
 
 <p align="center">
@@ -46,18 +52,6 @@ pip install -r requirements.txt .
 
 ## Inference
 
-The checkpoint of model should be placed at: `PyramidKV/ckpt`
-
-
-```markdown
-PyramidKV
-    |- Pyramidkv
-    |- data
-    |- ckpt
-        |- Llama-3-8B-Instruct
-    |- ...
-```
-
 
 We support inference code on `LongBench` to repuduce our result.
 
@@ -65,19 +59,24 @@ Please refer to `scripts/scripts_longBench/eval.sh` to modify the parameters acc
 
 ```bash
 export CUDA_VISIBLE_DEVICES=0
-python3 ${base_dir}/run.py \
-    --base_dir ${base_dir} \
+
+model_path=""
+method="PyramidKV"
+max_capacity_prompts=512 # 128,2048 in paper
+save_dir="results_long_bench" # path to result save_dir
+
+python3 run_longbench.py \
     --method ${method} \
-    --model_name ${model_name} \
+    --model_path ${model_path} \
     --max_capacity_prompts ${max_capacity_prompts} \
     --save_dir ${save_dir} \
     --use_cache True
+
 ```
 
 * CUDA_VISIBLE_DEVICES: LLaMA3 inference support on single GPU.
-* base_dir: Set it to the path of PyramidKV. (e.g. /home/PyramidKV)
-* model_name: Support "Llama-3-8B-Instruct"
-* method: Support "PyramidKV"
+* model_path: Path to your model. Support "Llama-3-8B-Instruct" for now.
+* method: Support "PyramidKV" for now.
 * max_capacity_prompts: Selected KV Size in each layer. （e.g. 128, 2048 in paper）. When method is "PyramidKV", given that the total number of KV remains unchanged, the specific KV length for each layer will be modified accordingly
 * save_dir: Path to your dir to save LongBench result.
 
