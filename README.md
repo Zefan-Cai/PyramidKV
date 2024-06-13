@@ -78,7 +78,7 @@ python3 run_longbench.py \
 
 * CUDA_VISIBLE_DEVICES: LLaMA3 inference support on single GPU.
 * model_path: Path to your model. Support "Llama-3-8B-Instruct" for now.
-* method: Support "PyramidKV" for now.
+* method: Support "PyramidKV", "SnapKV", "StreamingLLM", "H2O".
 * max_capacity_prompts: Selected KV Size in each layer. （e.g. 128, 2048 in paper）. When method is "PyramidKV", given that the total number of KV remains unchanged, the specific KV length for each layer will be modified accordingly
 * save_dir: Path to your dir to save LongBench result.
 
