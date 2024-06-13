@@ -13,6 +13,8 @@ Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression base
 
 - [ ] Support LLama2 and Mistral model
 
+- [ ] Support implementation of Needle
+
 ## Performence
 
 <p align="center">
