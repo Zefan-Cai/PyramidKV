@@ -660,7 +660,7 @@ def llama_model_forward(
                 all_hidden_states += (hidden_states,)
 
             past_seen_tokens = past_key_values.get_seq_length(layer_idx)
-            print(f"debug layer_idx {layer_idx} past_seen_tokens {past_seen_tokens}")
+            # print(f"debug layer_idx {layer_idx} past_seen_tokens {past_seen_tokens}")
             
             
 
