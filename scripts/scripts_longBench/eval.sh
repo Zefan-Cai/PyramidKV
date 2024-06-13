@@ -2,7 +2,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 
 model_path=""
-method="PyramidKV"
+method="PyramidKV" # Support PyramidKV, SnapKV, StreamingLLM, H2O
 max_capacity_prompts=512 # 128,2048 in paper
 save_dir="results_long_bench" # path to result save_dir
 

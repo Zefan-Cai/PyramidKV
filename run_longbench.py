@@ -173,12 +173,13 @@ def main(args):
 
     print("Finish loading model and tokenizer")
     
+    
     model_name = model_path.split("/")[-1]
 
-    os.makedirs(os.path.join(args.save_dir, model_name, args.dataset), exist_ok=True)
+    os.makedirs(os.path.join(args.save_dir, f"{model_name}_{args.method}_max_capacity_prompts_{args.max_capacity_prompts}_", args.dataset), exist_ok=True)
 
-    fout = open(os.path.join(args.save_dir, model_name, args.dataset, f"{args.method}.json"), "w")
-    
+    fout = open(os.path.join(args.save_dir, f"{model_name}_{args.method}_max_capacity_prompts_{args.max_capacity_prompts}_", args.dataset, f"{args.method}.json"), "w")
+     
     for i in tqdm(range(0, len(prompts), args.eval_batch_size)):
         
         batch_prompts = prompts[i:i+args.eval_batch_size]
@@ -220,22 +221,27 @@ def main(args):
         
         if args.method.lower() == "pyramidkv":
             window_sizes = 8
-            kernel_sizes = 7
-            pooling = "maxpool"
+        elif args.method.lower() in ["snapkv","streamingllm","h2o"]:
+            window_sizes = 32
             
-            layers = len(model.model.layers)
-            # check if window_sizes is a list
-            if not isinstance(window_sizes, list):
-                window_sizes = [window_sizes] * layers
-            if not isinstance(max_capacity_prompts, list):
-                max_capacity_prompts = [max_capacity_prompts] * layers
-            if not isinstance(kernel_sizes, list):
-                kernel_sizes = [kernel_sizes] * layers
-            for i in range(layers):
-                model.model.layers[i].self_attn.config.window_size = window_sizes[i]
-                model.model.layers[i].self_attn.config.max_capacity_prompt = max_capacity_prompts[i]
-                model.model.layers[i].self_attn.config.kernel_size = kernel_sizes[i]
-                model.model.layers[i].self_attn.config.pooling = pooling
+        kernel_sizes = 7
+        pooling = "maxpool"
+        
+        layers = len(model.model.layers)
+        # check if window_sizes is a list
+        if not isinstance(window_sizes, list):
+            window_sizes = [window_sizes] * layers
+        if not isinstance(max_capacity_prompts, list):
+            max_capacity_prompts = [max_capacity_prompts] * layers
+        if not isinstance(kernel_sizes, list):
+            kernel_sizes = [kernel_sizes] * layers
+        for i in range(layers):
+            model.model.layers[i].self_attn.config.window_size = window_sizes[i]
+            model.model.layers[i].self_attn.config.max_capacity_prompt = max_capacity_prompts[i]
+            model.model.layers[i].self_attn.config.kernel_size = kernel_sizes[i]
+            model.model.layers[i].self_attn.config.pooling = pooling
+    
+        
 
 
 
@@ -318,7 +324,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_cache", type=bool, default=True, help="")
     parser.add_argument("--attn_implementation", type=str,  default="flash_attention_2", choices=["flash_attention_2"])
     
-    parser.add_argument("--method", type=str,  default=None, choices=[ "PyramidKV"])
+    parser.add_argument("--method", type=str,  default=None)
 
     
     parser.add_argument("--max_capacity_prompts", type=int, default=512, help="")
@@ -409,7 +415,7 @@ if __name__ == "__main__":
     # args.max_capacity_prompts = max_capacity_prompts
 
     from pyramidkv.monkeypatch import replace_llama
-    replace_llama(args.method)
+    replace_llama(args.method.lower())
 
         
     for idx, dataset in enumerate(datasets):
@@ -420,12 +426,7 @@ if __name__ == "__main__":
     
         args.dataset = dataset
         
-        
-        
-        if args.max_capacity_prompts != -1:
-            args.save_dir = f"{save_dir}_{args.max_capacity_prompts}"
-        elif args.max_capacity_prompts_ratio != -1:
-            args.save_dir = f"{save_dir}_{args.max_capacity_prompts_ratio}"
+    
         
         
         args.data_file = f"data/LongBench/{args.dataset}.jsonl"
