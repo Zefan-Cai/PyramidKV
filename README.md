@@ -22,7 +22,7 @@ Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression base
 </p>
 
 <p align="center">
-    <img src="figs/Needle.png" width="100%"> <br>
+    <img src="figs/Needle.png" width="80%"> <br>
 </p>
 
 
