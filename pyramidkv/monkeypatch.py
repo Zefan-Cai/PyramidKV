@@ -40,7 +40,7 @@ def replace_llama(method):
     
     if method == "pyramidkv":
         print("Using PyramidKV!")
-        transformers.models.llama.modeling_llama.LlamaFlashAttention2.forward = llama_flash_attn2_forward_pyramid
+        transformers.models.llama.modeling_llama.LlamaFlashAttention2.forward = llama_flash_attn2_forward_PyramidKV
     
     elif method == "streamingllm":
         print("Using StreamingLLM!")
