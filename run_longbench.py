@@ -173,7 +173,6 @@ def main(args):
 
     print("Finish loading model and tokenizer")
     
-    
     model_name = model_path.split("/")[-1]
 
     os.makedirs(os.path.join(args.save_dir, f"{model_name}_{args.method}_max_capacity_prompts_{args.max_capacity_prompts}_", args.dataset), exist_ok=True)
@@ -204,8 +203,6 @@ def main(args):
             tokenized_prompts = tokenizer(prompt, padding="longest", return_tensors="pt", add_special_tokens=True).to('cuda')
             batch_input_ids = tokenized_prompts.input_ids
             attention_mask = tokenized_prompts.attention_mask
-
-
 
         # default to True
         if args.method == "DynamicKV":
@@ -240,10 +237,6 @@ def main(args):
             model.model.layers[i].self_attn.config.max_capacity_prompt = max_capacity_prompts[i]
             model.model.layers[i].self_attn.config.kernel_size = kernel_sizes[i]
             model.model.layers[i].self_attn.config.pooling = pooling
-    
-        
-
-
 
         past_key_values = None
        
@@ -264,8 +257,7 @@ def main(args):
 
         batch_outputs =tokenizer.batch_decode([output[0][context_length:]], skip_special_tokens=True)
         
-        
-        print(f"debbug batch_outputs {batch_outputs}")
+        # print(f"debbug batch_outputs {batch_outputs}")
         
         batch_generations = batch_outputs
 
@@ -297,16 +289,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
     parser.add_argument("--seed", type=int, default=42, help="")
-    
     parser.add_argument("--base_dir", type=str, default="")
-    
     parser.add_argument("--dataset", type=str, default="")
     parser.add_argument("--data_file", type=str, default="")
-    
     parser.add_argument("--save_dir", type=str, default="")
-    
 
-    
     parser.add_argument("--model_name", type=str, default=None, help="if specified, we will load the model to generate the predictions.")
     parser.add_argument("--model_path", type=str, default=None, help="if specified, we will load the model to generate the predictions.")
     parser.add_argument("--use_fast_tokenizer", type=bool, default=True, help="")
@@ -316,43 +303,16 @@ if __name__ == "__main__":
     parser.add_argument("--max_num_examples", type=int, default=None, help="maximum number of examples to evaluate per task.")
     parser.add_argument("--sample_method", type=str, default="topk", choices=["random", "topk"], help="how to sample the examples.")
     
-    
     parser.add_argument("--max_new_tokens", type=int, default=None, help="")
     
     parser.add_argument("--eval_batch_size", type=int, default=1, help="batch size for evaluation.")
     
     parser.add_argument("--use_cache", type=bool, default=True, help="")
     parser.add_argument("--attn_implementation", type=str,  default="flash_attention_2", choices=["flash_attention_2"])
-    
     parser.add_argument("--method", type=str,  default=None)
-
-    
     parser.add_argument("--max_capacity_prompts", type=int, default=512, help="")
     parser.add_argument("--max_capacity_prompts_ratio", type=float, default=-1, help="")
     parser.add_argument("--steps", type=int, default=-1, help="maximum number of examples to evaluate per task.")
-    
-    
-    
-    parser.add_argument(
-        "--load_in_8bit", 
-        action="store_true", 
-        help="load model in 8bit mode, which will reduce memory and speed up inference."
-    )
-    parser.add_argument(
-        "--gptq", 
-        action="store_true", 
-        help="If given, we're evaluating a 4-bit quantized GPTQ model."
-    )
-    parser.add_argument(
-        "--use_vllm",
-        action="store_true", 
-        help="If given, we will use the vllm library, which will likely increase the inference throughput."
-    )
-    parser.add_argument(
-        "--convert_to_half",
-        action="store_true", 
-        help=""
-    )
     
     parser.add_argument(
         "--use_chat_format", 
@@ -368,11 +328,7 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    
-    
     set_seed(args.seed)
-    
-
     
 
     tokenizer = AutoTokenizer.from_pretrained(
@@ -390,29 +346,19 @@ if __name__ == "__main__":
         attn_implementation=args.attn_implementation
     )
     
-    
-
-
-            
-    
-
 
     tokenizer.padding_side = "left"
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
     
-
         
     model.eval()
     
     save_dir = args.save_dir
     
-   
-    # for max_capacity_prompts in [512, 1024, 2048, 256, 4096]:
         
     max_capacity_prompts = args.max_capacity_prompts
-    # args.max_capacity_prompts = max_capacity_prompts
 
     from pyramidkv.monkeypatch import replace_llama
     replace_llama(args.method.lower())
@@ -422,14 +368,8 @@ if __name__ == "__main__":
         
         print(f"Working on max_capacity_prompts {args.max_capacity_prompts} dataset {dataset} - {idx}/{len(datasets)}")
         
-
-    
         args.dataset = dataset
         
-    
-        
-        
         args.data_file = f"data/LongBench/{args.dataset}.jsonl"
-        # os.path.join(args.base_dir, "data", "LongBench", "data", f"{args.dataset}.jsonl")
         
         main(args)
