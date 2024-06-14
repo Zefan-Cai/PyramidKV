@@ -352,6 +352,7 @@ if __name__ == "__main__":
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
     
+
         
     model.eval()
     
@@ -359,11 +360,15 @@ if __name__ == "__main__":
     
         
     max_capacity_prompts = args.max_capacity_prompts
+    
 
-    from pyramidkv.monkeypatch import replace_llama
+    from pyramidkv.monkeypatch import replace_llama,replace_mistral
+    
     replace_llama(args.method.lower())
+    replace_mistral(args.method.lower())
 
         
+
     for idx, dataset in enumerate(datasets):
         
         print(f"Working on max_capacity_prompts {args.max_capacity_prompts} dataset {dataset} - {idx}/{len(datasets)}")

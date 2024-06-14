@@ -19,7 +19,7 @@ import math
 
 logger = logging.get_logger(__name__)
 
-def llama_flash_attn2_forward_pyramid(
+def llama_flash_attn2_forward_PyramidKV(
     self,
     hidden_states: torch.Tensor,
     attention_mask: Optional[torch.LongTensor] = None,
@@ -660,7 +660,7 @@ def llama_model_forward(
                 all_hidden_states += (hidden_states,)
 
             past_seen_tokens = past_key_values.get_seq_length(layer_idx)
-            # print(f"debug layer_idx {layer_idx} past_seen_tokens {past_seen_tokens}")
+            print(f"debug layer_idx {layer_idx} past_seen_tokens {past_seen_tokens}")
             
             
 

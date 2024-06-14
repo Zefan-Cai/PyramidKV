@@ -11,7 +11,7 @@ Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression base
 
 - [x] Support implementation of Streaming LLM, H2O and SnapKV
 
-- [ ] Support LLama2 and Mistral model
+- [x] Support LLama2 and Mistral model
 
 - [ ] Support implementation of Needle
 
