@@ -96,9 +96,9 @@ sh scripts/scripts_longBench/eval.sh
 ```
 
 
-## Needle in hystack
+## Needle in haystack
 
-We support inference code on `Needle in hystack` to repuduce our result.
+We support inference code on `Needle in haystack` to repuduce our result.
 
 Please refer to `eval_needle/eval.sh` to modify the parameters according to your requirements.
 
@@ -108,7 +108,6 @@ To reproduce our results, run
 cd eval_needle
 
 bash eval.sh
-
 ```
 
 After inference, run
