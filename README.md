@@ -96,6 +96,28 @@ sh scripts/scripts_longBench/eval.sh
 ```
 
 
+## Needle in hystack
+
+We support inference code on `Needle in hystack` to repuduce our result.
+
+Please refer to `eval_needle/eval.sh` to modify the parameters according to your requirements.
+
+To reproduce our results, run
+
+```
+cd eval_needle
+
+bash eval.sh
+
+```
+
+After inference, run
+
+`python visualize.py` 
+
+to draw the img, you should change `FOLDER_PATH` in `visualize.py` to your output path (the argument of `--model_version` in `eval.sh`).
+
+
 ## Citation
 
 If you find **PyramidKV** useful for your research and applications, please kindly cite using this BibTeX:

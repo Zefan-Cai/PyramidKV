@@ -12,3 +12,7 @@ fuzzywuzzy
 python-Levenshtein
 protobuf
 -i https://pypi.org/simple/ bitsandbytes
+openai
+anthropic
+seaborn
+matplotlib
