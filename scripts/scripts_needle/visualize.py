@@ -7,7 +7,7 @@ import pandas as pd
 import json
 import glob
 
-FOLDER_PATH = "./results/LlaMA3_streamingllm_96_test/"
+FOLDER_PATH = "./results_needle/results/LlaMA3_streamingllm_96_test/"
 MODEL_NAME = "llama3"
 PRETRAINED_LEN=8150
 
@@ -52,11 +52,8 @@ def main():
 
     # Creating a DataFrame
     df = pd.DataFrame(data)
-    try:
-        locations = list(df["Context Length"].unique())
-    except:
-        import pdb
-        pdb.set_trace()
+
+    locations = list(df["Context Length"].unique())
     locations.sort()
     for li, l in enumerate(locations):
         if(l > PRETRAINED_LEN): break
@@ -97,7 +94,7 @@ def main():
     # Add a vertical line at the desired column index
     plt.axvline(x=pretrained_len + 0.8, color='white', linestyle='--', linewidth=4)
 
-    save_path = "img/%s.png" % model_name
+    save_path = "./results_needle/img/%s.png" % model_name
     print("saving at %s" % save_path)
     plt.savefig(save_path, dpi=150)
 

@@ -95,24 +95,52 @@ sh scripts/scripts_longBench/eval.sh
 
 ```
 
-
 ## Needle in haystack
 
 We support inference code on `Needle in haystack` to repuduce our result.
 
-Please refer to `eval_needle/eval.sh` to modify the parameters according to your requirements.
+Please refer to `scripts/scripts_needle/eval.sh` to modify the parameters according to your requirements.
+
+
+```
+
+METHOD='pyramidkv'       # ['full', 'pyramidkv', 'snapkv', 'streamingllm', 'h2o']
+MAX_CAPACITY_PROMPT=96  # [64, 96, 128, 256, 512, 1024, 2048, ...]
+TAG=test
+
+
+# For Llama3-8b
+
+(
+python -u run_needle_in_haystack.py --s_len 1000 --e_len 8001\
+    --model_provider LLaMA3 \
+    --model_name /mnt/workspace/zhiyuanhu/yuliang/models/llama3-8b_raw \
+    --step 100 \
+    --method $METHOD \
+    --max_capacity_prompt $MAX_CAPACITY_PROMPT \
+    --model_version LlaMA3_${METHOD}_${MAX_CAPACITY_PROMPT}_${TAG}
+) 2>&1  | tee results_needle/logs/LlaMA3_${METHOD}_${MAX_CAPACITY_PROMPT}_${TAG}.log
+
+```
+
+* Both LLaMA3 and Mistral2 inference support on single GPU.
+* model_provider: LLaMA3 or Mistral2
+* model_name: Path to your model. Support "Llama-3-8B-Instruct" "Mistral-7B-Instruct-v0.2" and for now.
+* step: The increase of context length.
+* method: Support `PyramidKV`, `SnapKV`, `StreamingLLM`, `H2O`.
+* max_capacity_prompt: Selected KV Size in each layer. （e.g. 128, 2048 in paper）. When method is "PyramidKV", given that the total number of KV remains unchanged, the specific KV length for each layer will be modified accordingly
+
+
 
 To reproduce our results, run
 
 ```
-cd eval_needle
-
-bash eval.sh
+bash scripts/scripts_needle/eval.sh
 ```
 
 After inference, run
 
-`python visualize.py` 
+`python scripts/scripts_needle/visualize.py` 
 
 to draw the img, you should change `FOLDER_PATH` in `visualize.py` to your output path (the argument of `--model_version` in `eval.sh`).
 

@@ -24,10 +24,6 @@ from datetime import datetime, timezone
 import time
 import torch
 
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
-sys.path.append(parent_dir)
 from pyramidkv.monkeypatch import replace_llama,replace_mistral
 
 scorer = rouge_scorer.RougeScorer(['rouge1', 'rougeL'], use_stemmer=True)
@@ -38,8 +34,8 @@ class LLMNeedleHaystackTester:
     """
     def __init__(self,
                  needle="\nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\n",#    \n在旧金山做的最棒的是事是吃一个三明治以及在晴天坐在多洛雷斯公园里\n
-                 haystack_dir="PaulGrahamEssays", # PaulGrahamEssays   new_chinese_haystack
-                 retrieval_question="The best thing to do in San Francisco is: ", # 在旧金山做什么事是最棒的？
+                 haystack_dir="data/PaulGrahamEssays", # PaulGrahamEssays  
+                 retrieval_question="The best thing to do in San Francisco is: ", 
                  results_version = 1,
                  context_lengths_min = 1000,
                  context_lengths_max = None,
@@ -307,25 +303,25 @@ class LLMNeedleHaystackTester:
             results['file_name'] : context_file_location
 
             # Save the context to file for retesting
-            if not os.path.exists('contexts'):
-                os.makedirs('contexts')
+            if not os.path.exists('results_needle/contexts'):
+                os.makedirs('results_needle/contexts')
 
-            if not os.path.exists(f'contexts/{self.model_version}'):
-                os.makedirs(f'contexts/{self.model_version}')
+            if not os.path.exists(f'results_needle/contexts/{self.model_version}'):
+                os.makedirs(f'results_needle/contexts/{self.model_version}')
 
-            with open(f'contexts/{self.model_version}/{context_file_location}_context.txt', 'w') as f:
+            with open(f'results_needle/contexts/{self.model_version}/{context_file_location}_context.txt', 'w') as f:
                 f.write(context)
             
         if self.save_results:
             # Save the context to file for retesting
-            if not os.path.exists('results'):
-                os.makedirs('results')
+            if not os.path.exists('results_needle/results'):
+                os.makedirs('results_needle/results')
             
-            if not os.path.exists(f'results/{self.model_version}'):
-                os.makedirs(f'results/{self.model_version}')
+            if not os.path.exists(f'results_needle/results/{self.model_version}'):
+                os.makedirs(f'results_needle/results/{self.model_version}')
 
             # Save the result to file for retesting
-            p = f'results/{self.model_version}/{context_file_location}_results.json'
+            p = f'results_needle/results/{self.model_version}/{context_file_location}_results.json'
             print("Writing at %s" % p)
             with open(p, 'w') as f:
                 json.dump(results, f, ensure_ascii=False)
@@ -335,7 +331,7 @@ class LLMNeedleHaystackTester:
         Checks to see if a result has already been evaluated or not
         """
 
-        results_dir = 'results/' + self.model_version
+        results_dir = 'results_needle/results/' + self.model_version
         print("Searching existing results at %s" % results_dir)
         if not os.path.exists(results_dir):
             return False
