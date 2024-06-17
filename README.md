@@ -43,7 +43,7 @@ Model attention maps for different layers would be stored at `./attention`
 ## Requirements
 
 ```python
-transformers==4.37
+transformers==4.40
 flash-attn==2.4.0
 ```
 
