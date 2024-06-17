@@ -24,7 +24,7 @@ def check_version():
 
 def replace_llama(method):
     transformers_version = check_version()
-    version_list = ['4.37']
+    version_list = ['4.40']
     warning_flag = True
     for version in version_list:
         if version in transformers_version:
@@ -64,7 +64,7 @@ def replace_llama(method):
 
 def replace_mistral(method):
     transformers_version = check_version()
-    version_list = ['4.37']
+    version_list = ['4.40']
     warning_flag = True
     for version in version_list:
         if version in transformers_version:
