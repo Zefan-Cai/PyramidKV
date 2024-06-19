@@ -73,11 +73,12 @@ class SnapKVCluster():
             return key_states, value_states
 
 class PyramidKVCluster():
-    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', layer_idx=None):
+    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', beta = 20, layer_idx=None):
         
         self.layer_idx = layer_idx
         
         self.steps = -1
+        self.beta = beta
         
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
@@ -100,7 +101,7 @@ class PyramidKVCluster():
         
         # TODO
         # window_sizes = 32
-        min_num = (self.max_capacity_prompt - self.window_size) // 20
+        min_num = (self.max_capacity_prompt - self.window_size) // self.beta
         max_num = (self.max_capacity_prompt - self.window_size) * 2 - min_num
         
             
@@ -113,8 +114,6 @@ class PyramidKVCluster():
         max_capacity_prompt = max_num - self.layer_idx * steps
         
         # print(f"debug max_capacity_prompt {max_capacity_prompt}")
-        
-        
         if q_len < self.max_capacity_prompt:
             return key_states, value_states
         elif q_len < (self.max_capacity_prompt - self.window_size) * 2:
