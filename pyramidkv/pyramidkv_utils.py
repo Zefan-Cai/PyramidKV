@@ -105,8 +105,8 @@ class PyramidKVCluster():
         max_num = (self.max_capacity_prompt - self.window_size) * 2 - min_num
         
             
-        if max_num > q_len - self.window_size - 1:
-            max_num = q_len - self.window_size - 1
+        if max_num >= q_len - self.window_size:
+            max_num = q_len - self.window_size
             min_num = (self.max_capacity_prompt - self.window_size) * 2 - max_num
     
        
