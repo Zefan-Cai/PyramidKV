@@ -308,7 +308,7 @@ if __name__ == "__main__":
     parser.add_argument("--eval_batch_size", type=int, default=1, help="batch size for evaluation.")
     
     parser.add_argument("--use_cache", type=bool, default=True, help="")
-    parser.add_argument("--attn_implementation", type=str,  default="flash_attention_2", choices=["flash_attention_2"])
+    parser.add_argument("--attn_implementation", type=str,  default="flash_attention_2", choices=["flash_attention_2", "sdpa", ""])
     parser.add_argument("--method", type=str,  default=None)
     parser.add_argument("--max_capacity_prompts", type=int, default=512, help="")
     parser.add_argument("--max_capacity_prompts_ratio", type=float, default=-1, help="")

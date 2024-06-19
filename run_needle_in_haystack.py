@@ -60,6 +60,7 @@ class LLMNeedleHaystackTester:
                  print_ongoing_status = True, 
                  step=100, 
                  method='pyramidkv', 
+                 attn_implementation='flash_attention_2',
                  max_capacity_prompt=128):
         """        
         :param needle: The needle to be found in the haystack. Default is None.
@@ -146,7 +147,7 @@ class LLMNeedleHaystackTester:
                                                                         low_cpu_mem_usage=True,
                                                                         device_map="auto",
                                                                         use_cache=False, 
-                                                                        attn_implementation='flash_attention_2'
+                                                                        attn_implementation=
                                                                     )
             # default to True
             
@@ -476,6 +477,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--s_len', metavar='N', type=int, help='a number')
     parser.add_argument('-e', '--e_len', metavar='N', type=int, help='a number')
     parser.add_argument('--model_name', type=str, default=None, help='name of model')
+    parser.add_argument("--attn_implementation", type=str,  default="flash_attention_2", choices=["flash_attention_2", "sdpa", ""])
     parser.add_argument('--model_version', type=str, default=None, help='provider of model')
     parser.add_argument('--model_name_suffix', type=str, default=None, help='name of model')
     parser.add_argument('--model_provider', type=str, default="LLaMA", help='which model to use')
@@ -497,7 +499,8 @@ if __name__ == "__main__":
                                  context_lengths_max=args.e_len, 
                                  step=args.step, 
                                  method=args.method, 
-                                 max_capacity_prompt=args.max_capacity_prompt
+                                 max_capacity_prompt=args.max_capacity_prompt,
+                                 attn_implementation=args.attn_implementation
                                  )
 
     ht.start_test(args)
