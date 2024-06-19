@@ -64,6 +64,8 @@ We support inference code on `LongBench` to repuduce our result.
 
 Please refer to `scripts/scripts_longBench/eval.sh` to modify the parameters according to your requirements.
 
+
+
 ```bash
 export CUDA_VISIBLE_DEVICES=0
 

@@ -115,7 +115,7 @@ class PyramidKVCluster():
         # print(f"debug max_capacity_prompt {max_capacity_prompt}")
         
         
-        if q_len < self.max_capacity_prompt - self.window_size:
+        if q_len < self.max_capacity_prompt:
             return key_states, value_states
         elif q_len < (self.max_capacity_prompt - self.window_size) * 2:
             attn_weights = torch.matmul(query_states[..., -self.window_size:, :], key_states.transpose(2, 3)) / math.sqrt(head_dim)
