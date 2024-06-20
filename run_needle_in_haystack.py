@@ -477,7 +477,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--s_len', metavar='N', type=int, help='a number')
     parser.add_argument('-e', '--e_len', metavar='N', type=int, help='a number')
     parser.add_argument('--model_name', type=str, default=None, help='name of model')
-    parser.add_argument("--attn_implementation", type=str,  default="flash_attention_2", choices=["flash_attention_2", "sdpa", ""])
+    parser.add_argument("--attn_implementation", type=str,  default="flash_attention_2", choices=["flash_attention_2", "sdpa", "None"])
     parser.add_argument('--model_version', type=str, default=None, help='provider of model')
     parser.add_argument('--model_name_suffix', type=str, default=None, help='name of model')
     parser.add_argument('--model_provider', type=str, default="LLaMA", help='which model to use')

@@ -8,7 +8,7 @@ mkdir -p ./results_needle/img/
 
 METHOD='pyramidkv'       # ['full', 'pyramidkv', 'snapkv', 'streamingllm', 'h2o']
 MAX_CAPACITY_PROMPT=96  # [64, 96, 128, 256, 512, 1024, 2048, ...]
-attn_implementation="flash_attention_2" # Support "flash_attention_2", "sdpa", "".
+attn_implementation="flash_attention_2" # Support "flash_attention_2", "sdpa", "None".
 TAG=test
 
 
