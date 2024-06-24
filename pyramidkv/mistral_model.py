@@ -34,6 +34,7 @@ def mistral_attn_forward_H2O(
     past_key_value: Optional[Cache] = None,
     output_attentions: bool = False,
     use_cache: bool = False,
+    cache_position: Optional[torch.LongTensor] = None,
     **kwargs,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     if "padding_mask" in kwargs:
@@ -85,47 +86,15 @@ def mistral_attn_forward_H2O(
     value_states = repeat_kv(value_states, self.num_key_value_groups)
 
     if past_key_value is not None:
-        # Activate slicing cache only if the config has a value `sliding_windows` attribute
-        cache_has_contents = past_key_value.get_seq_length(self.layer_idx) > 0
-        if (
-            getattr(self.config, "sliding_window", None) is not None
-            and kv_seq_len > self.config.sliding_window
-            and cache_has_contents
-        ):
-            slicing_tokens = 1 - self.config.sliding_window
-
-            past_key = past_key_value[self.layer_idx][0]
-            past_value = past_key_value[self.layer_idx][1]
-
-            past_key = past_key[:, :, slicing_tokens:, :].contiguous()
-            past_value = past_value[:, :, slicing_tokens:, :].contiguous()
-
-            # if past_key.shape[-2] != self.config.sliding_window - 1:
-            #     raise ValueError(
-            #         f"past key must have a shape of (`batch_size, num_heads, self.config.sliding_window-1, head_dim`), got"
-            #         f" {past_key.shape}"
-            #     )
-
-            if attention_mask is not None:
-                attention_mask = attention_mask[:, slicing_tokens:]
-                attention_mask = torch.cat([attention_mask, torch.ones_like(attention_mask[:, -1:])], dim=-1)
-
-        # print(f"debug key_states.shape[-2] {key_states.shape[-2]} kv_seq_len {kv_seq_len}")
-
-        cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
-        if key_states.shape[-2] >= kv_seq_len: # [SnapKV] add kv_cluster
+        # sin and cos are specific to RoPE models; cache_position needed for the static cache
+        cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+        if key_states.shape[-2] == kv_seq_len:
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
-            # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
-
-
-
 
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
@@ -480,6 +449,7 @@ def mistral_attn_forward_StreamingLLM(
     past_key_value: Optional[Cache] = None,
     output_attentions: bool = False,
     use_cache: bool = False,
+    cache_position: Optional[torch.LongTensor] = None,
     **kwargs,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     if "padding_mask" in kwargs:
@@ -530,44 +500,15 @@ def mistral_attn_forward_StreamingLLM(
     value_states = repeat_kv(value_states, self.num_key_value_groups)
 
     if past_key_value is not None:
-        # Activate slicing cache only if the config has a value `sliding_windows` attribute
-        cache_has_contents = past_key_value.get_seq_length(self.layer_idx) > 0
-        if (
-            getattr(self.config, "sliding_window", None) is not None
-            and kv_seq_len > self.config.sliding_window
-            and cache_has_contents
-        ):
-            slicing_tokens = 1 - self.config.sliding_window
-
-            past_key = past_key_value[self.layer_idx][0]
-            past_value = past_key_value[self.layer_idx][1]
-
-            past_key = past_key[:, :, slicing_tokens:, :].contiguous()
-            past_value = past_value[:, :, slicing_tokens:, :].contiguous()
-
-            # if past_key.shape[-2] != self.config.sliding_window - 1:
-            #     raise ValueError(
-            #         f"past key must have a shape of (`batch_size, num_heads, self.config.sliding_window-1, head_dim`), got"
-            #         f" {past_key.shape}"
-            #     )
-
-            if attention_mask is not None:
-                attention_mask = attention_mask[:, slicing_tokens:]
-                attention_mask = torch.cat([attention_mask, torch.ones_like(attention_mask[:, -1:])], dim=-1)
-
-        # print(f"debug key_states.shape[-2] {key_states.shape[-2]} kv_seq_len {kv_seq_len}")
-
-        cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
-        if key_states.shape[-2] >= kv_seq_len: # [SnapKV] add kv_cluster
+        # sin and cos are specific to RoPE models; cache_position needed for the static cache
+        cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+        if key_states.shape[-2] == kv_seq_len:
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
-            # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
 
 
 
@@ -928,6 +869,7 @@ def mistral_attn_forward_PyramidKV(
     past_key_value: Optional[Cache] = None,
     output_attentions: bool = False,
     use_cache: bool = False,
+    cache_position: Optional[torch.LongTensor] = None,
     **kwargs,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     if "padding_mask" in kwargs:
@@ -979,44 +921,15 @@ def mistral_attn_forward_PyramidKV(
     value_states = repeat_kv(value_states, self.num_key_value_groups)
 
     if past_key_value is not None:
-        # Activate slicing cache only if the config has a value `sliding_windows` attribute
-        cache_has_contents = past_key_value.get_seq_length(self.layer_idx) > 0
-        if (
-            getattr(self.config, "sliding_window", None) is not None
-            and kv_seq_len > self.config.sliding_window
-            and cache_has_contents
-        ):
-            slicing_tokens = 1 - self.config.sliding_window
-
-            past_key = past_key_value[self.layer_idx][0]
-            past_value = past_key_value[self.layer_idx][1]
-
-            past_key = past_key[:, :, slicing_tokens:, :].contiguous()
-            past_value = past_value[:, :, slicing_tokens:, :].contiguous()
-
-            # if past_key.shape[-2] != self.config.sliding_window - 1:
-            #     raise ValueError(
-            #         f"past key must have a shape of (`batch_size, num_heads, self.config.sliding_window-1, head_dim`), got"
-            #         f" {past_key.shape}"
-            #     )
-
-            if attention_mask is not None:
-                attention_mask = attention_mask[:, slicing_tokens:]
-                attention_mask = torch.cat([attention_mask, torch.ones_like(attention_mask[:, -1:])], dim=-1)
-
-        # print(f"debug key_states.shape[-2] {key_states.shape[-2]} kv_seq_len {kv_seq_len}")
-
-        cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
-        if key_states.shape[-2] >= kv_seq_len: # [SnapKV] add kv_cluster
+        # sin and cos are specific to RoPE models; cache_position needed for the static cache
+        cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+        if key_states.shape[-2] == kv_seq_len:
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
-            # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
 
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
@@ -1367,6 +1280,7 @@ def mistral_attn_forward_SnapKV(
     past_key_value: Optional[Cache] = None,
     output_attentions: bool = False,
     use_cache: bool = False,
+    cache_position: Optional[torch.LongTensor] = None,
     **kwargs,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     if "padding_mask" in kwargs:
@@ -1414,40 +1328,12 @@ def mistral_attn_forward_SnapKV(
     key_states = repeat_kv(key_states, self.num_key_value_groups)
     value_states = repeat_kv(value_states, self.num_key_value_groups)
     if past_key_value is not None:
-        # Activate slicing cache only if the config has a value `sliding_windows` attribute
-        cache_has_contents = past_key_value.get_seq_length(self.layer_idx) > 0
-        if (
-            getattr(self.config, "sliding_window", None) is not None
-            and kv_seq_len > self.config.sliding_window
-            and cache_has_contents
-        ):
-            slicing_tokens = 1 - self.config.sliding_window
-
-            past_key = past_key_value[self.layer_idx][0]
-            past_value = past_key_value[self.layer_idx][1]
-
-            past_key = past_key[:, :, slicing_tokens:, :].contiguous()
-            past_value = past_value[:, :, slicing_tokens:, :].contiguous()
-
-            # if past_key.shape[-2] != self.config.sliding_window - 1:
-            #     raise ValueError(
-            #         f"past key must have a shape of (`batch_size, num_heads, self.config.sliding_window-1, head_dim`), got"
-            #         f" {past_key.shape}"
-            #     )
-
-            if attention_mask is not None:
-                attention_mask = attention_mask[:, slicing_tokens:]
-                attention_mask = torch.cat([attention_mask, torch.ones_like(attention_mask[:, -1:])], dim=-1)
-
-        # print(f"debug key_states.shape[-2] {key_states.shape[-2]} kv_seq_len {kv_seq_len}")
-
-        cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
-        if key_states.shape[-2] >= kv_seq_len: # [SnapKV] add kv_cluster
+        # sin and cos are specific to RoPE models; cache_position needed for the static cache
+        cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+        if key_states.shape[-2] == kv_seq_len:
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
-            # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)

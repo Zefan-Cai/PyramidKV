@@ -216,27 +216,28 @@ def main(args):
             max_capacity_prompts = round(batch_input_ids.shape[1] * args.max_capacity_prompts_ratio)
         
         
-        if args.method.lower() == "pyramidkv":
-            window_sizes = 8
-        elif args.method.lower() in ["snapkv","streamingllm","h2o"]:
-            window_sizes = 32
+        if args.method != "FullKV":
+            if args.method.lower() == "pyramidkv":
+                window_sizes = 8
+            elif args.method.lower() in ["snapkv","streamingllm","h2o"]:
+                window_sizes = 32
+                
+            kernel_sizes = 7
+            pooling = "maxpool"
             
-        kernel_sizes = 7
-        pooling = "maxpool"
-        
-        layers = len(model.model.layers)
-        # check if window_sizes is a list
-        if not isinstance(window_sizes, list):
-            window_sizes = [window_sizes] * layers
-        if not isinstance(max_capacity_prompts, list):
-            max_capacity_prompts = [max_capacity_prompts] * layers
-        if not isinstance(kernel_sizes, list):
-            kernel_sizes = [kernel_sizes] * layers
-        for i in range(layers):
-            model.model.layers[i].self_attn.config.window_size = window_sizes[i]
-            model.model.layers[i].self_attn.config.max_capacity_prompt = max_capacity_prompts[i]
-            model.model.layers[i].self_attn.config.kernel_size = kernel_sizes[i]
-            model.model.layers[i].self_attn.config.pooling = pooling
+            layers = len(model.model.layers)
+            # check if window_sizes is a list
+            if not isinstance(window_sizes, list):
+                window_sizes = [window_sizes] * layers
+            if not isinstance(max_capacity_prompts, list):
+                max_capacity_prompts = [max_capacity_prompts] * layers
+            if not isinstance(kernel_sizes, list):
+                kernel_sizes = [kernel_sizes] * layers
+            for i in range(layers):
+                model.model.layers[i].self_attn.config.window_size = window_sizes[i]
+                model.model.layers[i].self_attn.config.max_capacity_prompt = max_capacity_prompts[i]
+                model.model.layers[i].self_attn.config.kernel_size = kernel_sizes[i]
+                model.model.layers[i].self_attn.config.pooling = pooling
 
         context_length = batch_input_ids.shape[-1]
 
