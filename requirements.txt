@@ -1,4 +1,4 @@
-transformers==4.37
+transformers==4.41
 pandas
 numpy
 torch
@@ -12,3 +12,7 @@ fuzzywuzzy
 python-Levenshtein
 protobuf
 -i https://pypi.org/simple/ bitsandbytes
+openai
+anthropic
+seaborn
+matplotlib

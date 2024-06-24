@@ -216,32 +216,30 @@ def main(args):
             max_capacity_prompts = round(batch_input_ids.shape[1] * args.max_capacity_prompts_ratio)
         
         
-        if args.method.lower() == "pyramidkv":
-            window_sizes = 8
-        elif args.method.lower() in ["snapkv","streamingllm","h2o"]:
-            window_sizes = 32
+        if args.method != "FullKV":
+            if args.method.lower() == "pyramidkv":
+                window_sizes = 8
+            elif args.method.lower() in ["snapkv","streamingllm","h2o"]:
+                window_sizes = 32
+                
+            kernel_sizes = 7
+            pooling = "maxpool"
             
-        kernel_sizes = 7
-        pooling = "maxpool"
-        
-        layers = len(model.model.layers)
-        # check if window_sizes is a list
-        if not isinstance(window_sizes, list):
-            window_sizes = [window_sizes] * layers
-        if not isinstance(max_capacity_prompts, list):
-            max_capacity_prompts = [max_capacity_prompts] * layers
-        if not isinstance(kernel_sizes, list):
-            kernel_sizes = [kernel_sizes] * layers
-        for i in range(layers):
-            model.model.layers[i].self_attn.config.window_size = window_sizes[i]
-            model.model.layers[i].self_attn.config.max_capacity_prompt = max_capacity_prompts[i]
-            model.model.layers[i].self_attn.config.kernel_size = kernel_sizes[i]
-            model.model.layers[i].self_attn.config.pooling = pooling
+            layers = len(model.model.layers)
+            # check if window_sizes is a list
+            if not isinstance(window_sizes, list):
+                window_sizes = [window_sizes] * layers
+            if not isinstance(max_capacity_prompts, list):
+                max_capacity_prompts = [max_capacity_prompts] * layers
+            if not isinstance(kernel_sizes, list):
+                kernel_sizes = [kernel_sizes] * layers
+            for i in range(layers):
+                model.model.layers[i].self_attn.config.window_size = window_sizes[i]
+                model.model.layers[i].self_attn.config.max_capacity_prompt = max_capacity_prompts[i]
+                model.model.layers[i].self_attn.config.kernel_size = kernel_sizes[i]
+                model.model.layers[i].self_attn.config.pooling = pooling
 
-        past_key_values = None
-       
         context_length = batch_input_ids.shape[-1]
-
 
         output = model.generate(
             **tokenized_prompts,
@@ -299,7 +297,6 @@ if __name__ == "__main__":
     parser.add_argument("--use_fast_tokenizer", type=bool, default=True, help="")
     parser.add_argument("--output_attentions", type=bool, default=False, help="")
     
-    
     parser.add_argument("--max_num_examples", type=int, default=None, help="maximum number of examples to evaluate per task.")
     parser.add_argument("--sample_method", type=str, default="topk", choices=["random", "topk"], help="how to sample the examples.")
     
@@ -308,7 +305,7 @@ if __name__ == "__main__":
     parser.add_argument("--eval_batch_size", type=int, default=1, help="batch size for evaluation.")
     
     parser.add_argument("--use_cache", type=bool, default=True, help="")
-    parser.add_argument("--attn_implementation", type=str,  default="flash_attention_2", choices=["flash_attention_2"])
+    parser.add_argument("--attn_implementation", type=str,  default="flash_attention_2", choices=["flash_attention_2", "sdpa", "eager"])
     parser.add_argument("--method", type=str,  default=None)
     parser.add_argument("--max_capacity_prompts", type=int, default=512, help="")
     parser.add_argument("--max_capacity_prompts_ratio", type=float, default=-1, help="")
@@ -337,15 +334,47 @@ if __name__ == "__main__":
         padding_side="left"
     )
 
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_path,
-        torch_dtype=torch.float16,
-        low_cpu_mem_usage=True,
-        device_map="auto",
-        use_cache=args.use_cache,
-        attn_implementation=args.attn_implementation
-    )
-    
+
+    if torch.cuda.device_count() > 1:
+        
+        from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+        from transformers import AutoConfig
+        
+        config = AutoConfig.from_pretrained(args.model_path)
+        
+        with init_empty_weights():
+            model = AutoModelForCausalLM.from_config(
+                config,
+                torch_dtype=torch.float16,
+                attn_implementation=args.attn_implementation,
+                )
+            
+        from pyramidkv.monkeypatch import replace_llama,replace_mistral, replace_cache
+        replace_llama(args.method.lower())
+        replace_mistral(args.method.lower())
+        replace_cache()
+        
+        model = load_checkpoint_and_dispatch(
+            model,
+            checkpoint=args.model_path,
+            device_map="auto",
+            no_split_module_classes=['LlamaDecoderLayer'],
+            dtype=torch.float16
+        )
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_path,
+            torch_dtype=torch.float16,
+            low_cpu_mem_usage=True,
+            device_map="auto",
+            use_cache=args.use_cache,
+            attn_implementation=args.attn_implementation
+        )
+        
+        from pyramidkv.monkeypatch import replace_llama,replace_mistral
+        replace_llama(args.method.lower())
+        replace_mistral(args.method.lower())
+        
 
     tokenizer.padding_side = "left"
     if tokenizer.pad_token is None:
@@ -362,10 +391,7 @@ if __name__ == "__main__":
     max_capacity_prompts = args.max_capacity_prompts
     
 
-    from pyramidkv.monkeypatch import replace_llama,replace_mistral
-    
-    replace_llama(args.method.lower())
-    replace_mistral(args.method.lower())
+
 
         
 

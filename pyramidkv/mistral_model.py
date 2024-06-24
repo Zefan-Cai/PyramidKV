@@ -1,4 +1,5 @@
 import inspect
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,7 +18,263 @@ from transformers.utils import (
 )
 from pyramidkv.pyramidkv_utils import init_pyramidkv,init_snapkv,init_H2O,init_StreamingLLM
 
+if is_flash_attn_2_available():
+    from flash_attn import flash_attn_func, flash_attn_varlen_func
+    from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input  # noqa
+
+    _flash_supports_window_size = "window_size" in list(inspect.signature(flash_attn_func).parameters)
+
+
 logger = logging.get_logger(__name__)
+
+def mistral_attn_forward_H2O(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Cache] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+    cache_position: Optional[torch.LongTensor] = None,
+    **kwargs,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    if "padding_mask" in kwargs:
+        warnings.warn(
+            "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
+        )
+    bsz, q_len, _ = hidden_states.size()
+
+    init_H2O(self)
+
+    query_states = self.q_proj(hidden_states)
+    key_states = self.k_proj(hidden_states)
+    value_states = self.v_proj(hidden_states)
+
+    query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+    key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+    value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+    kv_seq_len = key_states.shape[-2]
+    # if past_key_value is not None:
+    #     if self.layer_idx is None:
+    #         raise ValueError(
+    #             f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+    #             "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+    #             "with a layer index."
+    #         )
+    #     kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+    if past_key_value is not None:
+        if self.layer_idx is None:
+            raise ValueError(
+                f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+                "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+                "with a layer index."
+            )
+        if hasattr(self, "kv_seq_len"): #[SnapKV] add kv_seq_len
+            if self.kv_seq_len != 0:
+                kv_seq_len += self.kv_seq_len
+            else:
+                kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+        else:
+            kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+
+
+
+    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+    # repeat k/v heads if n_kv_heads < n_heads
+    key_states = repeat_kv(key_states, self.num_key_value_groups)
+    value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+    if past_key_value is not None:
+        # sin and cos are specific to RoPE models; cache_position needed for the static cache
+        cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+        if key_states.shape[-2] == kv_seq_len:
+            self.kv_seq_len = kv_seq_len
+            key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
+            past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
+        else:
+            self.kv_seq_len += q_len
+            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+
+    attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+
+    if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
+        raise ValueError(
+            f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
+            f" {attn_weights.size()}"
+        )
+
+    if attention_mask is not None:
+        if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+            raise ValueError(
+                f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+            )
+
+        attn_weights = attn_weights + attention_mask
+
+    # upcast attention to fp32
+    attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+    attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
+    attn_output = torch.matmul(attn_weights, value_states)
+
+    if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
+        raise ValueError(
+            f"`attn_output` should be of size {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
+            f" {attn_output.size()}"
+        )
+
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    attn_output = self.o_proj(attn_output)
+
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
+def mistral_sdpa_attn_forward_H2O(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Cache] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    if output_attentions:
+        # TODO: Improve this warning with e.g. `model.config.attn_implementation = "manual"` once this is implemented.
+        logger.warning_once(
+            "MistralModel is using MistralSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, "
+            'but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.'
+        )
+        return super().forward(
+            hidden_states=hidden_states,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_value=past_key_value,
+            output_attentions=output_attentions,
+            use_cache=use_cache,
+        )
+
+    init_H2O(self)
+
+    bsz, q_len, _ = hidden_states.size()
+
+    query_states = self.q_proj(hidden_states)
+    key_states = self.k_proj(hidden_states)
+    value_states = self.v_proj(hidden_states)
+
+    query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+    key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+    value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+    kv_seq_len = key_states.shape[-2]
+    # if past_key_value is not None:
+    #     if self.layer_idx is None:
+    #         raise ValueError(
+    #             f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+    #             "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+    #             "with a layer index."
+    #         )
+    #     kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+    if past_key_value is not None:
+        if self.layer_idx is None:
+            raise ValueError(
+                f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+                "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+                "with a layer index."
+            )
+        if hasattr(self, "kv_seq_len"): #[SnapKV] add kv_seq_len
+            if self.kv_seq_len != 0:
+                kv_seq_len += self.kv_seq_len
+            else:
+                kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+        else:
+            kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+
+
+    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+
+    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+    key_states = repeat_kv(key_states, self.num_key_value_groups)
+    value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+    if past_key_value is not None:
+        # Activate slicing cache only if the config has a value `sliding_windows` attribute
+        cache_has_contents = past_key_value.get_seq_length(self.layer_idx) > 0
+        if (
+            getattr(self.config, "sliding_window", None) is not None
+            and kv_seq_len > self.config.sliding_window
+            and cache_has_contents
+        ):
+            slicing_tokens = 1 - self.config.sliding_window
+
+            past_key = past_key_value[self.layer_idx][0]
+            past_value = past_key_value[self.layer_idx][1]
+
+            past_key = past_key[:, :, slicing_tokens:, :].contiguous()
+            past_value = past_value[:, :, slicing_tokens:, :].contiguous()
+
+            # if past_key.shape[-2] != self.config.sliding_window - 1:
+            #     raise ValueError(
+            #         f"past key must have a shape of (`batch_size, num_heads, self.config.sliding_window-1, head_dim`), got"
+            #         f" {past_key.shape}"
+            #     )
+
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, slicing_tokens:]
+                attention_mask = torch.cat([attention_mask, torch.ones_like(attention_mask[:, -1:])], dim=-1)
+
+        # print(f"debug key_states.shape[-2] {key_states.shape[-2]} kv_seq_len {kv_seq_len}")
+
+        cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
+        if key_states.shape[-2] >= kv_seq_len: # [SnapKV] add kv_cluster
+            self.kv_seq_len = kv_seq_len
+            key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
+            past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
+            
+            # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
+        else:
+            self.kv_seq_len += q_len
+            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+
+
+
+
+
+    if attention_mask is not None:
+        if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+            raise ValueError(
+                f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+            )
+
+    # SDPA with memory-efficient backend is currently (torch==2.1.2) bugged with non-contiguous inputs with custom attn_mask,
+    # Reference: https://github.com/pytorch/pytorch/issues/112577.
+    if query_states.device.type == "cuda" and attention_mask is not None:
+        query_states = query_states.contiguous()
+        key_states = key_states.contiguous()
+        value_states = value_states.contiguous()
+
+    attn_output = torch.nn.functional.scaled_dot_product_attention(
+        query_states,
+        key_states,
+        value_states,
+        attn_mask=attention_mask,
+        dropout_p=self.attention_dropout if self.training else 0.0,
+        # The q_len > 1 is necessary to match with AttentionMaskConverter.to_causal_4d that does not create a causal mask in case q_len == 1.
+        is_causal=self.is_causal and attention_mask is None and q_len > 1,
+    )
+
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.view(bsz, q_len, self.hidden_size)
+
+    attn_output = self.o_proj(attn_output)
+
+    return attn_output, None, past_key_value
+
 
 def mistral_flash_attn2_forward_H2O(
     self,
@@ -183,6 +440,260 @@ def mistral_flash_attn2_forward_H2O(
         attn_weights = None
 
     return attn_output, attn_weights, past_key_value
+
+
+def mistral_attn_forward_StreamingLLM(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Cache] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+    cache_position: Optional[torch.LongTensor] = None,
+    **kwargs,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    if "padding_mask" in kwargs:
+        warnings.warn(
+            "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
+        )
+    bsz, q_len, _ = hidden_states.size()
+
+    init_StreamingLLM(self)
+
+    query_states = self.q_proj(hidden_states)
+    key_states = self.k_proj(hidden_states)
+    value_states = self.v_proj(hidden_states)
+
+    query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+    key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+    value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+    kv_seq_len = key_states.shape[-2]
+    # if past_key_value is not None:
+    #     if self.layer_idx is None:
+    #         raise ValueError(
+    #             f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+    #             "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+    #             "with a layer index."
+    #         )
+    #     kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+    if past_key_value is not None:
+        if self.layer_idx is None:
+            raise ValueError(
+                f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+                "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+                "with a layer index."
+            )
+        if hasattr(self, "kv_seq_len"): #[SnapKV] add kv_seq_len
+            if self.kv_seq_len != 0:
+                kv_seq_len += self.kv_seq_len
+            else:
+                kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+        else:
+            kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+
+
+    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+    # repeat k/v heads if n_kv_heads < n_heads
+    key_states = repeat_kv(key_states, self.num_key_value_groups)
+    value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+    if past_key_value is not None:
+        # sin and cos are specific to RoPE models; cache_position needed for the static cache
+        cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+        if key_states.shape[-2] == kv_seq_len:
+            self.kv_seq_len = kv_seq_len
+            key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
+            past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
+        else:
+            self.kv_seq_len += q_len
+            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+
+
+
+
+    attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+
+    if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
+        raise ValueError(
+            f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
+            f" {attn_weights.size()}"
+        )
+
+    if attention_mask is not None:
+        if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+            raise ValueError(
+                f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+            )
+
+        attn_weights = attn_weights + attention_mask
+
+    # upcast attention to fp32
+    attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+    attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
+    attn_output = torch.matmul(attn_weights, value_states)
+
+    if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
+        raise ValueError(
+            f"`attn_output` should be of size {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
+            f" {attn_output.size()}"
+        )
+
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    attn_output = self.o_proj(attn_output)
+
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
+def mistral_sdpa_attn_forward_StreamingLLM(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Cache] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    if output_attentions:
+        # TODO: Improve this warning with e.g. `model.config.attn_implementation = "manual"` once this is implemented.
+        logger.warning_once(
+            "MistralModel is using MistralSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, "
+            'but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.'
+        )
+        return super().forward(
+            hidden_states=hidden_states,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_value=past_key_value,
+            output_attentions=output_attentions,
+            use_cache=use_cache,
+        )
+
+    init_StreamingLLM(self)
+
+    bsz, q_len, _ = hidden_states.size()
+
+    query_states = self.q_proj(hidden_states)
+    key_states = self.k_proj(hidden_states)
+    value_states = self.v_proj(hidden_states)
+
+    query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+    key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+    value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+    kv_seq_len = key_states.shape[-2]
+    # if past_key_value is not None:
+    #     if self.layer_idx is None:
+    #         raise ValueError(
+    #             f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+    #             "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+    #             "with a layer index."
+    #         )
+    #     kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+    if past_key_value is not None:
+        if self.layer_idx is None:
+            raise ValueError(
+                f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+                "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+                "with a layer index."
+            )
+        if hasattr(self, "kv_seq_len"): #[SnapKV] add kv_seq_len
+            if self.kv_seq_len != 0:
+                kv_seq_len += self.kv_seq_len
+            else:
+                kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+        else:
+            kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+
+
+        
+        
+        
+    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+    key_states = repeat_kv(key_states, self.num_key_value_groups)
+    value_states = repeat_kv(value_states, self.num_key_value_groups)
+    
+
+    if past_key_value is not None:
+        # Activate slicing cache only if the config has a value `sliding_windows` attribute
+        cache_has_contents = past_key_value.get_seq_length(self.layer_idx) > 0
+        if (
+            getattr(self.config, "sliding_window", None) is not None
+            and kv_seq_len > self.config.sliding_window
+            and cache_has_contents
+        ):
+            slicing_tokens = 1 - self.config.sliding_window
+
+            past_key = past_key_value[self.layer_idx][0]
+            past_value = past_key_value[self.layer_idx][1]
+
+            past_key = past_key[:, :, slicing_tokens:, :].contiguous()
+            past_value = past_value[:, :, slicing_tokens:, :].contiguous()
+
+            # if past_key.shape[-2] != self.config.sliding_window - 1:
+            #     raise ValueError(
+            #         f"past key must have a shape of (`batch_size, num_heads, self.config.sliding_window-1, head_dim`), got"
+            #         f" {past_key.shape}"
+            #     )
+
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, slicing_tokens:]
+                attention_mask = torch.cat([attention_mask, torch.ones_like(attention_mask[:, -1:])], dim=-1)
+
+        # print(f"debug key_states.shape[-2] {key_states.shape[-2]} kv_seq_len {kv_seq_len}")
+
+        cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
+        if key_states.shape[-2] >= kv_seq_len: # [SnapKV] add kv_cluster
+            self.kv_seq_len = kv_seq_len
+            key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
+            past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
+            
+            # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
+        else:
+            self.kv_seq_len += q_len
+            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+
+
+
+
+
+    if attention_mask is not None:
+        if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+            raise ValueError(
+                f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+            )
+
+    # SDPA with memory-efficient backend is currently (torch==2.1.2) bugged with non-contiguous inputs with custom attn_mask,
+    # Reference: https://github.com/pytorch/pytorch/issues/112577.
+    if query_states.device.type == "cuda" and attention_mask is not None:
+        query_states = query_states.contiguous()
+        key_states = key_states.contiguous()
+        value_states = value_states.contiguous()
+
+    attn_output = torch.nn.functional.scaled_dot_product_attention(
+        query_states,
+        key_states,
+        value_states,
+        attn_mask=attention_mask,
+        dropout_p=self.attention_dropout if self.training else 0.0,
+        # The q_len > 1 is necessary to match with AttentionMaskConverter.to_causal_4d that does not create a causal mask in case q_len == 1.
+        is_causal=self.is_causal and attention_mask is None and q_len > 1,
+    )
+
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.view(bsz, q_len, self.hidden_size)
+
+    attn_output = self.o_proj(attn_output)
+
+    return attn_output, None, past_key_value
 
 
 def mistral_flash_attn2_forward_StreamingLLM(
@@ -351,10 +862,249 @@ def mistral_flash_attn2_forward_StreamingLLM(
     return attn_output, attn_weights, past_key_value
 
 
-if is_flash_attn_2_available():
-    from flash_attn import flash_attn_func, flash_attn_varlen_func
-    from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input  # noqa
-    _flash_supports_window_size = "window_size" in list(inspect.signature(flash_attn_func).parameters)
+def mistral_attn_forward_PyramidKV(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Cache] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+    cache_position: Optional[torch.LongTensor] = None,
+    **kwargs,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    if "padding_mask" in kwargs:
+        warnings.warn(
+            "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
+        )
+    bsz, q_len, _ = hidden_states.size()
+
+    init_pyramidkv(self)
+
+    query_states = self.q_proj(hidden_states)
+    key_states = self.k_proj(hidden_states)
+    value_states = self.v_proj(hidden_states)
+
+    query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+    key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+    value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+    kv_seq_len = key_states.shape[-2]
+    # if past_key_value is not None:
+    #     if self.layer_idx is None:
+    #         raise ValueError(
+    #             f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+    #             "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+    #             "with a layer index."
+    #         )
+    #     kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+    if past_key_value is not None:
+        if self.layer_idx is None:
+            raise ValueError(
+                f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+                "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+                "with a layer index."
+            )
+        if hasattr(self, "kv_seq_len"): #[SnapKV] add kv_seq_len
+            if self.kv_seq_len != 0:
+                kv_seq_len += self.kv_seq_len
+            else:
+                kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+        else:
+            kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+            
+            
+            
+    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+    # repeat k/v heads if n_kv_heads < n_heads
+    key_states = repeat_kv(key_states, self.num_key_value_groups)
+    value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+    if past_key_value is not None:
+        # sin and cos are specific to RoPE models; cache_position needed for the static cache
+        cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+        if key_states.shape[-2] == kv_seq_len:
+            self.kv_seq_len = kv_seq_len
+            key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
+            past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
+        else:
+            self.kv_seq_len += q_len
+            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+
+    attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+
+    if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
+        raise ValueError(
+            f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
+            f" {attn_weights.size()}"
+        )
+
+    if attention_mask is not None:
+        if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+            raise ValueError(
+                f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+            )
+
+        attn_weights = attn_weights + attention_mask
+
+    # upcast attention to fp32
+    attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+    attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
+    attn_output = torch.matmul(attn_weights, value_states)
+
+    if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
+        raise ValueError(
+            f"`attn_output` should be of size {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
+            f" {attn_output.size()}"
+        )
+
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    attn_output = self.o_proj(attn_output)
+
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
+def mistral_sdpa_attn_forward_PyramidKV(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Cache] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    if output_attentions:
+        # TODO: Improve this warning with e.g. `model.config.attn_implementation = "manual"` once this is implemented.
+        logger.warning_once(
+            "MistralModel is using MistralSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, "
+            'but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.'
+        )
+        return super().forward(
+            hidden_states=hidden_states,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_value=past_key_value,
+            output_attentions=output_attentions,
+            use_cache=use_cache,
+        )
+
+    init_pyramidkv(self)
+
+    bsz, q_len, _ = hidden_states.size()
+
+    query_states = self.q_proj(hidden_states)
+    key_states = self.k_proj(hidden_states)
+    value_states = self.v_proj(hidden_states)
+
+    query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+    key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+    value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+    kv_seq_len = key_states.shape[-2]
+    # if past_key_value is not None:
+    #     if self.layer_idx is None:
+    #         raise ValueError(
+    #             f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+    #             "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+    #             "with a layer index."
+    #         )
+    #     kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+    if past_key_value is not None:
+        if self.layer_idx is None:
+            raise ValueError(
+                f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+                "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+                "with a layer index."
+            )
+        if hasattr(self, "kv_seq_len"): #[SnapKV] add kv_seq_len
+            if self.kv_seq_len != 0:
+                kv_seq_len += self.kv_seq_len
+            else:
+                kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+        else:
+            kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+
+    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+    key_states = repeat_kv(key_states, self.num_key_value_groups)
+    value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+    if past_key_value is not None:
+        # Activate slicing cache only if the config has a value `sliding_windows` attribute
+        cache_has_contents = past_key_value.get_seq_length(self.layer_idx) > 0
+        if (
+            getattr(self.config, "sliding_window", None) is not None
+            and kv_seq_len > self.config.sliding_window
+            and cache_has_contents
+        ):
+            slicing_tokens = 1 - self.config.sliding_window
+
+            past_key = past_key_value[self.layer_idx][0]
+            past_value = past_key_value[self.layer_idx][1]
+
+            past_key = past_key[:, :, slicing_tokens:, :].contiguous()
+            past_value = past_value[:, :, slicing_tokens:, :].contiguous()
+
+            # if past_key.shape[-2] != self.config.sliding_window - 1:
+            #     raise ValueError(
+            #         f"past key must have a shape of (`batch_size, num_heads, self.config.sliding_window-1, head_dim`), got"
+            #         f" {past_key.shape}"
+            #     )
+
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, slicing_tokens:]
+                attention_mask = torch.cat([attention_mask, torch.ones_like(attention_mask[:, -1:])], dim=-1)
+
+        # print(f"debug key_states.shape[-2] {key_states.shape[-2]} kv_seq_len {kv_seq_len}")
+
+        cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
+        if key_states.shape[-2] >= kv_seq_len: # [SnapKV] add kv_cluster
+            self.kv_seq_len = kv_seq_len
+            key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
+            past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
+            
+            # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
+        else:
+            self.kv_seq_len += q_len
+            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+
+
+
+    if attention_mask is not None:
+        if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+            raise ValueError(
+                f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+            )
+
+    # SDPA with memory-efficient backend is currently (torch==2.1.2) bugged with non-contiguous inputs with custom attn_mask,
+    # Reference: https://github.com/pytorch/pytorch/issues/112577.
+    if query_states.device.type == "cuda" and attention_mask is not None:
+        query_states = query_states.contiguous()
+        key_states = key_states.contiguous()
+        value_states = value_states.contiguous()
+
+    attn_output = torch.nn.functional.scaled_dot_product_attention(
+        query_states,
+        key_states,
+        value_states,
+        attn_mask=attention_mask,
+        dropout_p=self.attention_dropout if self.training else 0.0,
+        # The q_len > 1 is necessary to match with AttentionMaskConverter.to_causal_4d that does not create a causal mask in case q_len == 1.
+        is_causal=self.is_causal and attention_mask is None and q_len > 1,
+    )
+
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.view(bsz, q_len, self.hidden_size)
+
+    attn_output = self.o_proj(attn_output)
+
+    return attn_output, None, past_key_value
 
 
 def mistral_flash_attn2_forward_PyramidKV(
@@ -521,6 +1271,251 @@ def mistral_flash_attn2_forward_PyramidKV(
         attn_weights = None
 
     return attn_output, attn_weights, past_key_value
+
+
+def mistral_attn_forward_SnapKV(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Cache] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+    cache_position: Optional[torch.LongTensor] = None,
+    **kwargs,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    if "padding_mask" in kwargs:
+        warnings.warn(
+            "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
+        )
+    bsz, q_len, _ = hidden_states.size()
+
+    init_snapkv(self)
+
+    query_states = self.q_proj(hidden_states)
+    key_states = self.k_proj(hidden_states)
+    value_states = self.v_proj(hidden_states)
+
+    query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+    key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+    value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+    kv_seq_len = key_states.shape[-2]
+    # if past_key_value is not None:
+    #     if self.layer_idx is None:
+    #         raise ValueError(
+    #             f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+    #             "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+    #             "with a layer index."
+    #         )
+    #     kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+    if past_key_value is not None:
+        if self.layer_idx is None:
+            raise ValueError(
+                f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+                "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+                "with a layer index."
+            )
+        if hasattr(self, "kv_seq_len"): #[SnapKV] add kv_seq_len
+            if self.kv_seq_len != 0:
+                kv_seq_len += self.kv_seq_len
+            else:
+                kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+        else:
+            kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+    # repeat k/v heads if n_kv_heads < n_heads
+    key_states = repeat_kv(key_states, self.num_key_value_groups)
+    value_states = repeat_kv(value_states, self.num_key_value_groups)
+    if past_key_value is not None:
+        # sin and cos are specific to RoPE models; cache_position needed for the static cache
+        cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
+        if key_states.shape[-2] == kv_seq_len:
+            self.kv_seq_len = kv_seq_len
+            key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
+            past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
+        else:
+            self.kv_seq_len += q_len
+            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+
+
+    attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+
+    if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
+        raise ValueError(
+            f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
+            f" {attn_weights.size()}"
+        )
+
+    if attention_mask is not None:
+        if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+            raise ValueError(
+                f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+            )
+
+        attn_weights = attn_weights + attention_mask
+
+    # upcast attention to fp32
+    attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+    attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
+    attn_output = torch.matmul(attn_weights, value_states)
+
+    if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
+        raise ValueError(
+            f"`attn_output` should be of size {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
+            f" {attn_output.size()}"
+        )
+
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    attn_output = self.o_proj(attn_output)
+
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
+def mistral_sdpa_attn_forward_SnapKV(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Cache] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    if output_attentions:
+        # TODO: Improve this warning with e.g. `model.config.attn_implementation = "manual"` once this is implemented.
+        logger.warning_once(
+            "MistralModel is using MistralSdpaAttention, but `torch.nn.functional.scaled_dot_product_attention` does not support `output_attentions=True`. Falling back to the manual attention implementation, "
+            'but specifying the manual implementation will be required from Transformers version v5.0.0 onwards. This warning can be removed using the argument `attn_implementation="eager"` when loading the model.'
+        )
+        return super().forward(
+            hidden_states=hidden_states,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_value=past_key_value,
+            output_attentions=output_attentions,
+            use_cache=use_cache,
+        )
+
+    init_snapkv(self)
+
+    bsz, q_len, _ = hidden_states.size()
+
+    query_states = self.q_proj(hidden_states)
+    key_states = self.k_proj(hidden_states)
+    value_states = self.v_proj(hidden_states)
+
+    query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+    key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+    value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+    kv_seq_len = key_states.shape[-2]
+    # if past_key_value is not None:
+    #     if self.layer_idx is None:
+    #         raise ValueError(
+    #             f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+    #             "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+    #             "with a layer index."
+    #         )
+    #     kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+    if past_key_value is not None:
+        if self.layer_idx is None:
+            raise ValueError(
+                f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+                "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+                "with a layer index."
+            )
+        if hasattr(self, "kv_seq_len"): #[SnapKV] add kv_seq_len
+            if self.kv_seq_len != 0:
+                kv_seq_len += self.kv_seq_len
+            else:
+                kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+        else:
+            kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+
+
+    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+
+    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+    key_states = repeat_kv(key_states, self.num_key_value_groups)
+    value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+    if past_key_value is not None:
+        # Activate slicing cache only if the config has a value `sliding_windows` attribute
+        cache_has_contents = past_key_value.get_seq_length(self.layer_idx) > 0
+        if (
+            getattr(self.config, "sliding_window", None) is not None
+            and kv_seq_len > self.config.sliding_window
+            and cache_has_contents
+        ):
+            slicing_tokens = 1 - self.config.sliding_window
+
+            past_key = past_key_value[self.layer_idx][0]
+            past_value = past_key_value[self.layer_idx][1]
+
+            past_key = past_key[:, :, slicing_tokens:, :].contiguous()
+            past_value = past_value[:, :, slicing_tokens:, :].contiguous()
+
+            # if past_key.shape[-2] != self.config.sliding_window - 1:
+            #     raise ValueError(
+            #         f"past key must have a shape of (`batch_size, num_heads, self.config.sliding_window-1, head_dim`), got"
+            #         f" {past_key.shape}"
+            #     )
+
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, slicing_tokens:]
+                attention_mask = torch.cat([attention_mask, torch.ones_like(attention_mask[:, -1:])], dim=-1)
+
+        # print(f"debug key_states.shape[-2] {key_states.shape[-2]} kv_seq_len {kv_seq_len}")
+
+        cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
+        if key_states.shape[-2] >= kv_seq_len: # [SnapKV] add kv_cluster
+            self.kv_seq_len = kv_seq_len
+            key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
+            past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
+            
+            # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
+        else:
+            self.kv_seq_len += q_len
+            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+
+
+
+    if attention_mask is not None:
+        if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+            raise ValueError(
+                f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+            )
+
+    # SDPA with memory-efficient backend is currently (torch==2.1.2) bugged with non-contiguous inputs with custom attn_mask,
+    # Reference: https://github.com/pytorch/pytorch/issues/112577.
+    if query_states.device.type == "cuda" and attention_mask is not None:
+        query_states = query_states.contiguous()
+        key_states = key_states.contiguous()
+        value_states = value_states.contiguous()
+
+    attn_output = torch.nn.functional.scaled_dot_product_attention(
+        query_states,
+        key_states,
+        value_states,
+        attn_mask=attention_mask,
+        dropout_p=self.attention_dropout if self.training else 0.0,
+        # The q_len > 1 is necessary to match with AttentionMaskConverter.to_causal_4d that does not create a causal mask in case q_len == 1.
+        is_causal=self.is_causal and attention_mask is None and q_len > 1,
+    )
+
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.view(bsz, q_len, self.hidden_size)
+
+    attn_output = self.o_proj(attn_output)
+
+    return attn_output, None, past_key_value
+
 
 def mistral_flash_attn2_forward_SnapKV(
     self,
@@ -762,227 +1757,3 @@ def prepare_inputs_for_generation_mistral(
     )
     return model_inputs
 
-
-
-
-def sparsity_forward(
-    attention_scores: torch.LongTensor = None,
-    method: str = "matrix"
-    ):
-    
-    attention_scores = torch.stack(attention_scores).squeeze(1) # [layer_idx, num_heads, seq_length]
-    
-    if method== "matrix":
-        
-        softmaxed_attention_scores = F.softmax(attention_scores, dim=-1)
-        head_sparsity = torch.exp(softmaxed_attention_scores * 10).sum(dim=-1) # [layer_idx, num_head]
-        layer_sparsity = head_sparsity.mean(dim=-1) # [layer_idx]
-        fixed_layer_sparsity = max(layer_sparsity) - layer_sparsity + (max(layer_sparsity) - min(layer_sparsity)) / 5
-        return fixed_layer_sparsity
-    
-    elif method == "gini":
-        layer_sparsity = []
-        for layer_idx in range(attention_scores.shape[0]):
-            head_sparsity = []
-            for head_idx in range(attention_scores.shape[1]):
-                head_attn = attention_scores[layer_idx, head_idx, :].cpu().numpy()
-                gini_value = gini(head_attn)
-                head_sparsity.append(gini_value)
-                
-            layer_gini.append(round(sum(head_sparsity) / len(head_sparsity) * 100))
-        layer_gini = torch.tensor(layer_gini)
-        return layer_gini
-    
-    elif method == "entropy":
-        from torch.distributions import Categorical
-        entropy = Categorical(probs = softmaxed_attention_scores).entropy()
-        
-        pass
-
-
-
-def mistral_model_forward(
-        self,
-        input_ids: torch.LongTensor = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[List[torch.FloatTensor]] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
-    ) -> Union[Tuple, BaseModelOutputWithPast]:
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
-        )
-        use_cache = use_cache if use_cache is not None else self.config.use_cache
-
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
-        # retrieve input_ids and inputs_embeds
-        if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
-        elif input_ids is not None:
-            batch_size, seq_length = input_ids.shape
-        elif inputs_embeds is not None:
-            batch_size, seq_length, _ = inputs_embeds.shape
-        else:
-            raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
-
-        if self.gradient_checkpointing and self.training:
-            if use_cache:
-                logger.warning_once(
-                    "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
-                )
-                use_cache = False
-
-        past_key_values_length = 0
-
-        if use_cache:
-            use_legacy_cache = not isinstance(past_key_values, Cache)
-            if use_legacy_cache:
-                past_key_values = DynamicCache.from_legacy_cache(past_key_values)
-            past_key_values_length = past_key_values.get_usable_length(seq_length)
-
-        if position_ids is None:
-            device = input_ids.device if input_ids is not None else inputs_embeds.device
-            position_ids = torch.arange(
-                past_key_values_length, seq_length + past_key_values_length, dtype=torch.long, device=device
-            )
-            position_ids = position_ids.unsqueeze(0).view(-1, seq_length)
-        else:
-            position_ids = position_ids.view(-1, seq_length).long()
-
-        if inputs_embeds is None:
-            inputs_embeds = self.embed_tokens(input_ids)
-
-        if attention_mask is not None and self._attn_implementation == "flash_attention_2" and use_cache:
-            is_padding_right = attention_mask[:, -1].sum().item() != batch_size
-            if is_padding_right:
-                raise ValueError(
-                    "You are attempting to perform batched generation with padding_side='right'"
-                    " this may lead to unexpected behaviour for Flash Attention version of Mistral. Make sure to "
-                    " call `tokenizer.padding_side  = 'left'` before tokenizing the input. "
-                )
-
-        if self._attn_implementation == "flash_attention_2":
-            # 2d mask is passed through the layers
-            attention_mask = attention_mask if (attention_mask is not None and 0 in attention_mask) else None
-        elif self._attn_implementation == "sdpa" and not output_attentions:
-            # output_attentions=True can not be supported when using SDPA, and we fall back on
-            # the manual implementation that requires a 4D causal mask in all cases.
-            attention_mask = _prepare_4d_causal_attention_mask_for_sdpa(
-                attention_mask,
-                (batch_size, seq_length),
-                inputs_embeds,
-                past_key_values_length,
-                sliding_window=self.config.sliding_window,
-            )
-        else:
-            # 4d mask is passed through the layers
-            attention_mask = _prepare_4d_causal_attention_mask(
-                attention_mask,
-                (batch_size, seq_length),
-                inputs_embeds,
-                past_key_values_length,
-                sliding_window=self.config.sliding_window,
-            )
-
-        hidden_states = inputs_embeds
-
-        # decoder layers
-        all_hidden_states = () if output_hidden_states else None
-        all_self_attns = () if output_attentions else None
-        next_decoder_cache = None
-
-        for layer_idx, decoder_layer in enumerate(self.layers):
-            if output_hidden_states:
-                all_hidden_states += (hidden_states,)
-
-
-            past_seen_tokens = past_key_values.get_seq_length(layer_idx)
-            # print(f"debug layer_idx {layer_idx} past_seen_tokens {past_seen_tokens}")
-
-            if self.gradient_checkpointing and self.training:
-                layer_outputs = self._gradient_checkpointing_func(
-                    decoder_layer.__call__,
-                    hidden_states,
-                    attention_mask,
-                    position_ids,
-                    past_key_values,
-                    output_attentions,
-                    use_cache,
-                )
-            else:
-                layer_outputs = decoder_layer(
-                    hidden_states,
-                    attention_mask=attention_mask,
-                    position_ids=position_ids,
-                    past_key_value=past_key_values,
-                    output_attentions=output_attentions,
-                    use_cache=use_cache,
-                )
-
-            hidden_states = layer_outputs[0]
-
-            if use_cache:
-                next_decoder_cache = layer_outputs[2 if output_attentions else 1]
-
-            if output_attentions:
-                all_self_attns += (layer_outputs[1],)
-
-
-
-
-        if output_attentions == True and all_self_attns[0] is not None:
-            
-            
-            sparsity = sparsity_forward(all_self_attns)
-            
-            # In DynamicKV setting, the max_capacity_prompt needs to be fixed like SnapKV
-            token_allocation = torch.round(sparsity / sum(sparsity) * len(self.layers) * self.layers[0].self_attn.config.max_capacity_prompt)
-            
-
-            for layer_idx in range(len(self.layers)):
-                window_size = self.layers[layer_idx].self_attn.config.window_size
-                max_capacity_prompt = int(token_allocation[layer_idx].item())
-                
-                key_states, value_states = next_decoder_cache.key_cache[layer_idx], next_decoder_cache.value_cache[layer_idx]
-                
-                indices = all_self_attns[layer_idx].topk(max_capacity_prompt, dim=-1).indices
-                indices = indices.unsqueeze(-1).expand(-1, -1, -1, key_states.shape[-1])
-                
-                k_past_compress = key_states[:, :, :-window_size, :].gather(dim = 2, index = indices)
-                v_past_compress = value_states[:, :, :-window_size, :].gather(dim = 2, index = indices)
-                k_cur = key_states[:, :, -window_size:, :]
-                v_cur = value_states[:, :, -window_size:, :]
-                
-                key_states = torch.cat([k_past_compress, k_cur], dim = 2)
-                value_states = torch.cat([v_past_compress, v_cur], dim = 2)
-                
-                next_decoder_cache.key_cache[layer_idx] = k_past_compress
-                next_decoder_cache.value_cache[layer_idx] = v_past_compress
-
-
-
-
-        hidden_states = self.norm(hidden_states)
-
-        # add hidden states from the last decoder layer
-        if output_hidden_states:
-            all_hidden_states += (hidden_states,)
-
-        next_cache = None
-        if use_cache:
-            next_cache = next_decoder_cache.to_legacy_cache() if use_legacy_cache else next_decoder_cache
-
-        if not return_dict:
-            return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
-        return BaseModelOutputWithPast(
-            last_hidden_state=hidden_states,
-            past_key_values=next_cache,
-            hidden_states=all_hidden_states,
-            attentions=all_self_attns,
-        )
