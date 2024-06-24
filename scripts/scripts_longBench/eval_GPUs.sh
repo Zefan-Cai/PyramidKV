@@ -6,7 +6,8 @@ method=$2 # Support PyramidKV, SnapKV, H2O, StreamingLLM
 max_capacity_prompts=64 # 128,2048 in paper
 attn_implementation=$3 # Support "flash_attention_2", "sdpa", "eager".
 source_path=$4
-model_path=${source_path}"models/Meta-Llama-3-8B-Instruct"
+model_name=$5
+model_path=${source_path}"models/"${model_name}
 save_dir=${source_path}"results_long_bench" # path to result save_dir
 
 python3 run_longbench.py \
