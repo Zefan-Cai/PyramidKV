@@ -1,4 +1,4 @@
-transformers==4.40
+transformers==4.41
 pandas
 numpy
 torch

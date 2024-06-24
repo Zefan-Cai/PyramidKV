@@ -10,9 +10,6 @@ from pyramidkv.mistral_model import mistral_flash_attn2_forward_PyramidKV,mistra
 from pyramidkv.mistral_model import mistral_attn_forward_PyramidKV,mistral_attn_forward_H2O,mistral_attn_forward_SnapKV,mistral_attn_forward_StreamingLLM
 from pyramidkv.mistral_model import mistral_sdpa_attn_forward_PyramidKV,mistral_sdpa_attn_forward_H2O,mistral_sdpa_attn_forward_SnapKV,mistral_sdpa_attn_forward_StreamingLLM
 
-from pyramidkv.llama_model import llama_model_forward
-from pyramidkv.mistral_model import mistral_model_forward
-
 from pyramidkv.llama_model import prepare_inputs_for_generation_llama
 
 from pyramidkv.mistral_model import prepare_inputs_for_generation_mistral
@@ -27,7 +24,7 @@ def check_version():
 
 def replace_llama(method):
     transformers_version = check_version()
-    version_list = ['4.40']
+    version_list = ['4.41']
     warning_flag = True
     for version in version_list:
         if version in transformers_version:
@@ -39,8 +36,6 @@ def replace_llama(method):
     
     # Pyramid KV method
    
-    transformers.models.llama.modeling_llama.LlamaModel.forward= llama_model_forward
-    
     if method == "pyramidkv":
         print("Using PyramidKV!")
         transformers.models.llama.modeling_llama.LlamaAttention.forward = llama_attn_forward_PyramidKV
@@ -75,7 +70,7 @@ def replace_llama(method):
 
 def replace_mistral(method):
     transformers_version = check_version()
-    version_list = ['4.40']
+    version_list = ['4.41']
     warning_flag = True
     for version in version_list:
         if version in transformers_version:
@@ -86,8 +81,6 @@ def replace_mistral(method):
     
     
     # Pyramid KV method
-   
-    transformers.models.mistral.modeling_mistral.MistralModel.forward= mistral_model_forward
     
     if method == "pyramidkv":
         print("Using PyramidKV!")
