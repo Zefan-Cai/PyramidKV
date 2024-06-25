@@ -122,7 +122,7 @@ class PyramidKVCluster():
             return key_states, value_states
 
 class SnapKVCluster():
-    def __init__(self, num_hidden_layers = 32, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
@@ -176,7 +176,7 @@ class SnapKVCluster():
 
 
 class H2OKVCluster():
-    def __init__(self, num_hidden_layers = 32, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
@@ -231,7 +231,7 @@ class H2OKVCluster():
 
 
 class StreamingLLMKVCluster():
-    def __init__(self, num_hidden_layers = 32, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
@@ -289,7 +289,7 @@ class StreamingLLMKVCluster():
             return key_states, value_states
 
 
-def init_pyramidkv(self):
+def init_pyramidkv(self, num_hidden_layers):
     if not hasattr(self, "kv_cluster"):
         if not hasattr(self.config, 'window_size'):
             self.config.window_size = 32
@@ -302,6 +302,7 @@ def init_pyramidkv(self):
     
     
     self.kv_cluster = PyramidKVCluster( 
+        num_hidden_layers = num_hidden_layers,
         layer_idx = self.layer_idx,
         window_size = self.config.window_size, 
         max_capacity_prompt = self.config.max_capacity_prompt, 
