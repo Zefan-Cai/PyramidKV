@@ -22,9 +22,10 @@ def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
 
 
 class PyramidKVCluster():
-    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', beta = 20, layer_idx=None):
+    def __init__(self, num_hidden_layers = 32, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', beta = 20, num_layers = 80, layer_idx=None):
         
         self.layer_idx = layer_idx
+        self.num_hidden_layers = num_hidden_layers
         
         self.steps = -1
         self.beta = beta
@@ -59,7 +60,7 @@ class PyramidKVCluster():
             min_num = (self.max_capacity_prompt - self.window_size) * 2 - max_num
     
        
-        steps = (max_num - min_num) // 31
+        steps = (max_num - min_num) // self.num_hidden_layers
         max_capacity_prompt = max_num - self.layer_idx * steps
         
         print(f"PyramidKV max_capacity_prompt {max_capacity_prompt}")
@@ -121,7 +122,7 @@ class PyramidKVCluster():
             return key_states, value_states
 
 class SnapKVCluster():
-    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def __init__(self, num_hidden_layers = 32, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
@@ -175,7 +176,7 @@ class SnapKVCluster():
 
 
 class H2OKVCluster():
-    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def __init__(self, num_hidden_layers = 32, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
@@ -230,7 +231,7 @@ class H2OKVCluster():
 
 
 class StreamingLLMKVCluster():
-    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def __init__(self, num_hidden_layers = 32, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
