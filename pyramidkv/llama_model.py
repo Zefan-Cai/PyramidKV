@@ -14,7 +14,6 @@ from transformers.utils import (
     logging,
 )
 from pyramidkv.pyramidkv_utils import init_pyramidkv,init_snapkv,init_H2O,init_StreamingLLM
-from pygini import gini
 import math
 
 logger = logging.get_logger(__name__)

@@ -5,7 +5,6 @@ torch
 evaluate
 accelerate
 SentencePiece
-flash_attn
 jieba
 rouge
 fuzzywuzzy
