@@ -9,6 +9,8 @@ Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression base
 
 ## News
 
+- [2024-06-25] Support multi-GPUs inference with big LLMs now! Try out PyramidKV on LlaMa-3-70B-Instruct!
+
 - [2024-06-10] Support PyramidKV, SnapKV, H2O and StreamingLLM at Flash Attention v2, Sdpa Attention now! If your devices (i.e., V100, 3090) does not support Flash Attention v2, you can set attn_implementation=sdpa to try PyramidKV at Sdpa Attention!
 
 - [2024-06-10] Updated version of PyramidKV paper is available at [ARXIV](https://arxiv.org/pdf/2406.02069) with updated results of Needle in haystack for LlaMa-3-8B-Instruct and Mistral-7B-Instruct.
@@ -23,9 +25,9 @@ Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression base
 
 - [x] Support KV cache compression without Flash Attention v2 (i.e. Sdpa Attention) for V100
 
-- [ ] Support Mixtral
+- [x] Support multi-GPU inference for 70B LlaMa-3
 
-- [ ] Support multi-GPU inference for 70B LlaMa-3
+- [ ] Support Mixtral
 
 ## Performence
 
@@ -55,8 +57,8 @@ Model attention maps for different layers would be stored at `./attention`
 ## Requirements
 
 ```python
-transformers==4.41
-flash-attn==2.4.0
+transformers >= 4.41
+flash-attn >= 2.4.0
 ```
 
 ##  Installation
@@ -79,25 +81,27 @@ Please refer to `scripts/scripts_longBench/eval.sh` to modify the parameters acc
 Our codebase support Flash Attention v2, Sdpa Attention, etc. The results presented in our paper in based on Flash Attention v2.
 
 ```bash
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=$1
 
-model_path=""
-method="PyramidKV" # Support "PyramidKV", "SnapKV", "StreamingLLM", "H2O".
-attn_implementation="flash_attention_2" # Support "flash_attention_2", "sdpa", "".
-max_capacity_prompts=512 # 128,2048 in paper
-save_dir="results_long_bench" # path to result save_dir
+method=$2 # Support PyramidKV, SnapKV, H2O, StreamingLLM
+max_capacity_prompts=64 # 128,2048 in paper
+attn_implementation=$3 # Support "flash_attention_2", "sdpa", "eager".
+source_path=$4
+model_path=$5
+save_dir=${source_path}"results_long_bench" # path to result save_dir
 
 python3 run_longbench.py \
     --method ${method} \
     --model_path ${model_path} \
-    --attn_implementation ${attn_implementation} \
     --max_capacity_prompts ${max_capacity_prompts} \
+    --attn_implementation ${attn_implementation} \
     --save_dir ${save_dir} \
     --use_cache True
 
+
 ```
 
-* CUDA_VISIBLE_DEVICES: LLaMA3 inference support on single GPU.
+* CUDA_VISIBLE_DEVICES: For multi-GPU inference for big LLMs, just need to specify CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7. For single GPU inference, just need to specify CUDA_VISIBLE_DEVICES=0.
 * model_path: Path to your model. Support "Llama-3-8B-Instruct" for now.
 * method: Support `PyramidKV`, `SnapKV`, `StreamingLLM`, `H2O`.
 * max_capacity_prompts: Selected KV Size in each layer. （e.g. 128, 2048 in paper）. When method is "PyramidKV", given that the total number of KV remains unchanged, the specific KV length for each layer will be modified accordingly

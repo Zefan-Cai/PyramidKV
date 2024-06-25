@@ -67,18 +67,6 @@ def replace_cache():
     transformers.DynamicCache.update = cache_update
 
 def replace_llama(method):
-    transformers_version = check_version()
-    version_list = ['4.41']
-    warning_flag = True
-    for version in version_list:
-        if version in transformers_version:
-            warning_flag = False
-            break
-    if warning_flag:
-        warnings.warn(f"Transformers version {transformers_version} might not be compatible with PyramidKV. PyramidKV is tested with Transformers version {version_list}.")
-    
-    
-    # Pyramid KV method
    
     if method == "pyramidkv":
         print("Using PyramidKV!")
@@ -113,18 +101,6 @@ def replace_llama(method):
 
 
 def replace_mistral(method):
-    transformers_version = check_version()
-    version_list = ['4.41']
-    warning_flag = True
-    for version in version_list:
-        if version in transformers_version:
-            warning_flag = False
-            break
-    if warning_flag:
-        warnings.warn(f"Transformers version {transformers_version} might not be compatible with PyramidKV. PyramidKV is tested with Transformers version {version_list}.")
-    
-    
-    # Pyramid KV method
     
     if method == "pyramidkv":
         print("Using PyramidKV!")
