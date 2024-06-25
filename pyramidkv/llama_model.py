@@ -32,7 +32,7 @@ def llama_attn_forward_PyramidKV(
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     bsz, q_len, _ = hidden_states.size()
 
-    init_pyramidkv(self, num_hidden_layers=config.num_hidden_layers)
+    init_pyramidkv(self, num_hidden_layers=self.config.num_hidden_layers)
 
     if self.config.pretraining_tp > 1:
         key_value_slicing = (self.num_key_value_heads * self.head_dim) // self.config.pretraining_tp
@@ -159,7 +159,7 @@ def llama_sdpa_attn_forward_PyramidKV(
             cache_position=cache_position,
         )
 
-    init_pyramidkv(self, num_hidden_layers=config.num_hidden_layers)
+    init_pyramidkv(self, num_hidden_layers=self.config.num_hidden_layers)
 
     bsz, q_len, _ = hidden_states.size()
 
@@ -250,7 +250,7 @@ def llama_flash_attn2_forward_PyramidKV(
     **kwargs,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     
-    init_pyramidkv(self, num_hidden_layers=config.num_hidden_layers)
+    init_pyramidkv(self, num_hidden_layers=self.config.num_hidden_layers)
     # LlamaFlashAttention2 attention does not support output_attentions
     if "padding_mask" in kwargs:
         warnings.warn(
@@ -1058,7 +1058,7 @@ def llama_attn_forward_SnapKV(
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     bsz, q_len, _ = hidden_states.size()
 
-    init_SnapKV(self)
+    init_snapkv(self)
 
     if self.config.pretraining_tp > 1:
         key_value_slicing = (self.num_key_value_heads * self.head_dim) // self.config.pretraining_tp
@@ -1183,7 +1183,7 @@ def llama_sdpa_attn_forward_SnapKV(
             cache_position=cache_position,
         )
 
-    init_SnapKV(self)
+    init_snapkv(self)
 
     bsz, q_len, _ = hidden_states.size()
 
@@ -1273,7 +1273,7 @@ def llama_flash_attn2_forward_SnapKV(
     **kwargs,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     # [SnapKV] register kv_cluster
-    init_SnapKV(self)
+    init_snapkv(self)
     # LlamaFlashAttention2 attention does not support output_attentions
     if "padding_mask" in kwargs:
         warnings.warn(
