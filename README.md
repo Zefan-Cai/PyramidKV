@@ -29,6 +29,8 @@ Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression base
 
 - [ ] Support Mixtral
 
+- [ ] Support Batch Inference
+
 ## Performence
 
 <p align="center">
