@@ -17,7 +17,7 @@ TAG=test
 (
 python -u run_needle_in_haystack.py --s_len 1000 --e_len 8001\
     --model_provider LLaMA3 \
-    --model_name /mnt/workspace/zhiyuanhu/yuliang/models/llama3-8b_raw \
+    --model_name YOU_PATH_TO_LLAMA_3 \
     --attn_implementation ${attn_implementation} \
     --step 100 \
     --method $METHOD \
