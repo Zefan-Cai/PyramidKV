@@ -335,34 +335,6 @@ if __name__ == "__main__":
     )
 
 
-    # if torch.cuda.device_count() > 1:
-        
-    #     from accelerate import init_empty_weights, load_checkpoint_and_dispatch
-    #     from transformers import AutoConfig
-        
-    #     config = AutoConfig.from_pretrained(args.model_path)
-        
-    #     with init_empty_weights():
-    #         model = AutoModelForCausalLM.from_config(
-    #             config,
-    #             torch_dtype=torch.float16,
-    #             attn_implementation=args.attn_implementation,
-    #             )
-            
-    #     from pyramidkv.monkeypatch import replace_llama,replace_mistral, replace_cache
-    #     replace_llama(args.method.lower())
-    #     replace_mistral(args.method.lower())
-    #     replace_cache()
-        
-    #     model = load_checkpoint_and_dispatch(
-    #         model,
-    #         checkpoint=args.model_path,
-    #         device_map="auto",
-    #         no_split_module_classes=['LlamaDecoderLayer'],
-    #         dtype=torch.float16
-    #     )
-    # else:
-    
     from pyramidkv.monkeypatch import replace_llama,replace_mistral
     replace_llama(args.method.lower())
     replace_mistral(args.method.lower())
