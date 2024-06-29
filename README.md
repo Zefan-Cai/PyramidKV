@@ -1,7 +1,6 @@
 # Pyramid KV
 
 
-Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression based on Pyramidal Information Funneling](https://arxiv.org/pdf/2406.02069)".
 
 <p align="center">
     <img src="figs/PyramidKV.png" width="100%"> <br>
