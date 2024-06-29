@@ -41,7 +41,6 @@ dataset2metric = {
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_name', type=str, default=None)
     parser.add_argument('--results_dir', type=str, default=None)
     parser.add_argument('--longbench_e', action='store_true', help="Evaluate on LongBench-E")
     return parser.parse_args(args)
@@ -99,6 +98,7 @@ if __name__ == '__main__':
     
     results_list = [
         ["dataset"],
+        ["FullKV"],
         ["random"],
         ["SnapKV"],
         ["StreamingLLM"],
@@ -106,23 +106,16 @@ if __name__ == '__main__':
         ["PyramidKV"],
     ]
     
-    # results_list = [
-    #     ["dataset"],
-    #     ["H2_global"],
-    #     ["PyramidKV_global"],
-    #     ["local"]
-    # ]
-    
     for dataset in dataset_list:
         
         results_list[0].append(dataset)
         
-        for idx, method in enumerate(["random", "SnapKV", "StreamingLLM", "H2O", "PyramidKV"]):
+        for idx, method in enumerate(["FullKV", "random", "SnapKV", "StreamingLLM", "H2O", "PyramidKV"]):
         # for idx, method in enumerate(["H2_global", "PyramidKV_global", "local"]):
             try:
                 args.method = method
                 args.dataset = dataset
-                args.eval_file = os.path.join('/mnt/users/v-caizefan/Attention/',args.results_dir,args.model_name,dataset,f"{method}.json")
+                args.eval_file = os.path.join(args.results_dir,dataset,f"{method}.json")
                 
                 # try:
                 
@@ -183,6 +176,6 @@ if __name__ == '__main__':
                 print(f"dataset {args.dataset} method {args.method} scores {None}")
                 
     import csv
-    with open(os.path.join('/mnt/users/v-caizefan/Attention',args.results_dir,args.model_name,f"results.csv"), 'w') as fp:
+    with open(os.path.join(args.results_dir,f"results.csv"), 'w') as fp:
         writer = csv.writer(fp)
         writer.writerows(results_list)
