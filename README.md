@@ -29,6 +29,10 @@ Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression base
 
 - [ ] Support Mixtral
 
+- [ ] Support Batch Inference
+
+- [ ] Support KV cache compression at decoding stage
+
 ## Performence
 
 <p align="center">
@@ -58,7 +62,7 @@ Model attention maps for different layers would be stored at `./attention`
 
 ```python
 transformers >= 4.41
-flash-attn >= 2.4.0
+flash-attn >= 2.4.0.post1
 ```
 
 ##  Installation
