@@ -175,7 +175,7 @@ def main(args):
     
     model_name = model_path.split("/")[-1]
 
-    os.makedirs(os.path.join(args.save_dir, f"{model_name}_{args.method}_{args.max_capacity_prompts}", args.dataset), exist_ok=True)
+    os.makedirs(os.path.join(args.save_dir, f"{model_name}_{args.max_capacity_prompts}", args.dataset), exist_ok=True)
 
     fout = open(os.path.join(args.save_dir, f"{model_name}_{args.max_capacity_prompts}", args.dataset, f"{args.method}.json"), "w")
      
@@ -335,45 +335,48 @@ if __name__ == "__main__":
     )
 
 
-    if torch.cuda.device_count() > 1:
+    # if torch.cuda.device_count() > 1:
         
-        from accelerate import init_empty_weights, load_checkpoint_and_dispatch
-        from transformers import AutoConfig
+    #     from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+    #     from transformers import AutoConfig
         
-        config = AutoConfig.from_pretrained(args.model_path)
+    #     config = AutoConfig.from_pretrained(args.model_path)
         
-        with init_empty_weights():
-            model = AutoModelForCausalLM.from_config(
-                config,
-                torch_dtype=torch.float16,
-                attn_implementation=args.attn_implementation,
-                )
+    #     with init_empty_weights():
+    #         model = AutoModelForCausalLM.from_config(
+    #             config,
+    #             torch_dtype=torch.float16,
+    #             attn_implementation=args.attn_implementation,
+    #             )
             
-        from pyramidkv.monkeypatch import replace_llama,replace_mistral, replace_cache
-        replace_llama(args.method.lower())
-        replace_mistral(args.method.lower())
-        replace_cache()
+    #     from pyramidkv.monkeypatch import replace_llama,replace_mistral, replace_cache
+    #     replace_llama(args.method.lower())
+    #     replace_mistral(args.method.lower())
+    #     replace_cache()
         
-        model = load_checkpoint_and_dispatch(
-            model,
-            checkpoint=args.model_path,
-            device_map="auto",
-            no_split_module_classes=['LlamaDecoderLayer'],
-            dtype=torch.float16
-        )
-    else:
-        model = AutoModelForCausalLM.from_pretrained(
-            args.model_path,
-            torch_dtype=torch.float16,
-            low_cpu_mem_usage=True,
-            device_map="auto",
-            use_cache=args.use_cache,
-            attn_implementation=args.attn_implementation
-        )
-        
-        from pyramidkv.monkeypatch import replace_llama,replace_mistral
-        replace_llama(args.method.lower())
-        replace_mistral(args.method.lower())
+    #     model = load_checkpoint_and_dispatch(
+    #         model,
+    #         checkpoint=args.model_path,
+    #         device_map="auto",
+    #         no_split_module_classes=['LlamaDecoderLayer'],
+    #         dtype=torch.float16
+    #     )
+    # else:
+    
+    from pyramidkv.monkeypatch import replace_llama,replace_mistral
+    replace_llama(args.method.lower())
+    replace_mistral(args.method.lower())
+    
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_path,
+        torch_dtype=torch.float16,
+        low_cpu_mem_usage=True,
+        device_map="auto",
+        use_cache=args.use_cache,
+        attn_implementation=args.attn_implementation
+    )
+    
+
         
 
     tokenizer.padding_side = "left"
