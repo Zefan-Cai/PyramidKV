@@ -879,7 +879,7 @@ def mistral_attn_forward_PyramidKV(
         )
     bsz, q_len, _ = hidden_states.size()
 
-    init_pyramidkv(self, num_hidden_layers=config.num_hidden_layers)
+    init_pyramidkv(self, num_hidden_layers=self.config.num_hidden_layers)
 
     query_states = self.q_proj(hidden_states)
     key_states = self.k_proj(hidden_states)
@@ -994,7 +994,7 @@ def mistral_sdpa_attn_forward_PyramidKV(
             use_cache=use_cache,
         )
 
-    init_pyramidkv(self, num_hidden_layers=config.num_hidden_layers)
+    init_pyramidkv(self, num_hidden_layers=self.config.num_hidden_layers)
 
     bsz, q_len, _ = hidden_states.size()
 
@@ -1118,7 +1118,7 @@ def mistral_flash_attn2_forward_PyramidKV(
     **kwargs,
 ):
     
-    init_pyramidkv(self, num_hidden_layers=config.num_hidden_layers)
+    init_pyramidkv(self, num_hidden_layers=self.config.num_hidden_layers)
     if "padding_mask" in kwargs:
         warnings.warn(
             "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
