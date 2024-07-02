@@ -10,16 +10,8 @@ from pyramidkv.mistral_model import mistral_attn_forward_PyramidKV,mistral_attn_
 from pyramidkv.mistral_model import mistral_sdpa_attn_forward_PyramidKV,mistral_sdpa_attn_forward_H2O,mistral_sdpa_attn_forward_SnapKV,mistral_sdpa_attn_forward_StreamingLLM
 
 from pyramidkv.llama_model import prepare_inputs_for_generation_llama
-
 from pyramidkv.mistral_model import prepare_inputs_for_generation_mistral
 
-
-def check_version():
-    try:
-        transformers_version = version("transformers")
-    except Exception as e:
-        print(f"Transformers not installed: {e}")
-    return transformers_version
 
 def replace_llama(method):
    
