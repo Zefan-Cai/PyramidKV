@@ -1,7 +1,6 @@
 # Pyramid KV
 
 
-Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression based on Pyramidal Information Funneling](https://arxiv.org/pdf/2406.02069)".
 
 <p align="center">
     <img src="figs/PyramidKV.png" width="100%"> <br>
@@ -12,8 +11,6 @@ Official repository for the paper "[PyramidKV: Dynamic KV Cache Compression base
 - [2024-06-25] Support multi-GPUs inference with big LLMs now! Try out PyramidKV on LlaMa-3-70B-Instruct!
 
 - [2024-06-10] Support PyramidKV, SnapKV, H2O and StreamingLLM at Flash Attention v2, Sdpa Attention now! If your devices (i.e., V100, 3090) does not support Flash Attention v2, you can set attn_implementation=sdpa to try PyramidKV at Sdpa Attention!
-
-- [2024-06-10] Updated version of PyramidKV paper is available at [ARXIV](https://arxiv.org/pdf/2406.02069) with updated results of Needle in haystack for LlaMa-3-8B-Instruct and Mistral-7B-Instruct.
 
 ## TODO:
 
