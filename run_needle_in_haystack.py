@@ -18,6 +18,7 @@ from rouge_score import rouge_scorer
 
 import sys
 import os
+import tensor_parallel as tp
 
 from openai import OpenAI
 from datetime import datetime, timezone
@@ -37,7 +38,7 @@ class LLMNeedleHaystackTester:
                  haystack_dir="data/PaulGrahamEssays", # PaulGrahamEssays  
                  retrieval_question="The best thing to do in San Francisco is: ", 
                  results_version = 1,
-                 context_lengths_min = 1000,
+                 context_lengths_min = None,
                  context_lengths_max = None,
                  context_lengths_num_intervals = 40,
                  context_lengths = None,
@@ -71,7 +72,7 @@ class LLMNeedleHaystackTester:
         :param save_results: Whether or not you would like to save your contexts to file. Warning: These will get long! Default = True
         :param save_contexts: Whether or not you would like to save your contexts to file. Warning: These will get long! Default is True.
         :param final_context_length_buffer: The amount of cushion you'd like to leave off the input context to allow for the output context. Default 200 tokens
-        :param context_lengths_min: The minimum length of the context. Default is 1000.
+        :param context_lengths_min: The minimum length of the context. Default is 0.
         :param context_lengths_max: The maximum length of the context. Default is 200000.
         :param context_lengths_num_intervals: The number of intervals for the context length. Default is 35.
         :param context_lengths: The lengths of the context. Default is None.
@@ -105,6 +106,7 @@ class LLMNeedleHaystackTester:
         self.step = step
         self.method = method
         self.max_capacity_prompts = max_capacity_prompt
+        self.attn_implementation = attn_implementation
 
 
         self.model_version = model_version
@@ -141,27 +143,43 @@ class LLMNeedleHaystackTester:
             # self.enc.add_special_tokens({'pad_token': '[PAD]'})
             print("loading from %s" % model_name)
 
-            
-            self.model_to_test = AutoModelForCausalLM.from_pretrained(model_name,
-                                                                        torch_dtype=torch.bfloat16,
-                                                                        low_cpu_mem_usage=True,
-                                                                        device_map="auto",
-                                                                        use_cache=False, 
-                                                                        attn_implementation=
-                                                                    )
-            # default to True
-            
-            # pdb.set_trace()
+
+            # if torch.cuda.device_count()>1:
+
+            from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+            from transformers import AutoConfig 
+
+
+            if self.method == 'full':
+                self.model_to_test=AutoModelForCausalLM.from_pretrained(
+                    model_name, 
+                    torch_dtype=torch.float16,
+                    attn_implementation=self.attn_implementation,
+                    device_map="auto",
+                    low_cpu_mem_usage=True, 
+                    # use_cache=False
+                    ).eval()
+
+
             if self.method in ["pyramidkv", "snapkv","streamingllm","h2o"]:
             
                 if self.model_provider == 'LLaMA3':
                     replace_llama(self.method.lower())
                 elif self.model_provider == 'Mistral':
                     replace_mistral(self.method.lower())
-                    
+                     
                 if self.max_capacity_prompts != -1:
                     max_capacity_prompts = self.max_capacity_prompts
-                
+            
+                self.model_to_test=AutoModelForCausalLM.from_pretrained(
+                    model_name, 
+                    torch_dtype=torch.float16,
+                    attn_implementation=self.attn_implementation,
+                    device_map="auto",
+                    low_cpu_mem_usage=True, 
+                    # use_cache=False
+                    ).eval()
+
                 
                 if self.method.lower() == "pyramidkv":
                     window_sizes = 8
@@ -170,6 +188,7 @@ class LLMNeedleHaystackTester:
                     
                 kernel_sizes = 7
                 pooling = "maxpool"
+
                 
                 layers = len(self.model_to_test.model.layers)
                 # check if window_sizes is a list
@@ -185,6 +204,9 @@ class LLMNeedleHaystackTester:
                     self.model_to_test.model.layers[i].self_attn.config.kernel_size = kernel_sizes[i]
                     self.model_to_test.model.layers[i].self_attn.config.pooling = pooling
                     
+                
+                # self.model_to_test = tp.tensor_parallel(self.model_to_test, sharded=True)
+
         else:raise ValueError("model_provider must be either 'LLaMA3' or 'Mistral'")
             
 
@@ -259,7 +281,7 @@ class LLMNeedleHaystackTester:
             output_ids = self.model_to_test.generate(
                 input_ids, 
                 output_attentions=False,
-                max_new_tokens=40,
+                max_new_tokens=30,
                 num_beams=1,
                 do_sample=False,
                 temperature=1.0,
@@ -493,6 +515,7 @@ if __name__ == "__main__":
                                  model_name_suffix=args.model_name_suffix,
                                  model_provider=args.model_provider,
                                  model_version=args.model_version, 
+                                 context_lengths_min=args.s_len,
                                  save_contexts=True,
                                  save_results=True,
                                  openai_api_key=args.api_key, 

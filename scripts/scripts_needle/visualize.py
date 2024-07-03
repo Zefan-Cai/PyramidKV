@@ -7,9 +7,10 @@ import pandas as pd
 import json
 import glob
 
-FOLDER_PATH = "./results_needle/results/LlaMA3_streamingllm_96_test/"
-MODEL_NAME = "llama3"
-PRETRAINED_LEN=8150
+FOLDER_PATH = "./results_needle/results/mistral2_7b_pyramidkv_128_run/"
+MODEL_NAME = "mistral_2_7b"
+PRETRAINED_LEN=33000
+
 
 def main():
     # Path to the directory containing JSON results
@@ -42,7 +43,7 @@ def main():
             model_response = json_data.get("model_response", None).lower()
             needle = json_data.get("needle", None).lower()
             expected_answer = "eat a sandwich and sit in Dolores Park on a sunny day.".lower().split()
-            score = len(set(model_response.split()).intersection(set(expected_answer))) / len(expected_answer)
+            score = len(set(model_response.split()).intersection(set(expected_answer))) / len(set(expected_answer))
             # Appending to the list
             data.append({
                 "Document Depth": document_depth,
