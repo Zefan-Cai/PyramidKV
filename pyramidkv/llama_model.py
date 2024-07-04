@@ -323,7 +323,7 @@ def llama_flash_attn2_forward_PyramidKV(
 
         # print(f"after self.key_cache[layer_idx] {past_key_value.key_cache[self.layer_idx].device}")
         # print(f"after self.value_states[layer_idx] {past_key_value.value_cache[self.layer_idx].device}")
-        
+    print(f"debug key_states.shape {key_states.shape}")
 
     # TODO: These transpose are quite inefficient but Flash Attention requires the layout [batch_size, sequence_length, num_heads, head_dim]. We would need to refactor the KV cache
     # to be able to avoid many of these transpose/reshape/view.

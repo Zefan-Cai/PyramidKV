@@ -246,10 +246,11 @@ def main(args):
             output_attentions = args.output_attentions,
             max_new_tokens=output_max_len,
             num_beams=1,
+            
             do_sample=False,
             temperature=1.0,
             min_length=context_length+1,
-            eos_token_id=[tokenizer.eos_token_id, tokenizer.encode("\n", add_special_tokens=False)[-1]]
+            eos_token_id=[tokenizer.eos_token_id]
         )
 
 
@@ -370,7 +371,7 @@ if __name__ == "__main__":
 
         
 
-    for idx, dataset in enumerate(datasets):
+    for idx, dataset in enumerate(datasets[8:9]):
         
         print(f"Working on max_capacity_prompts {args.max_capacity_prompts} dataset {dataset} - {idx}/{len(datasets)}")
         
