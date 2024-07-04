@@ -96,9 +96,6 @@ def llama_attn_forward_PyramidKV(
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
 
-
-
-
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
     if attention_mask is not None:  # no matter the length, we just slice it
@@ -323,7 +320,7 @@ def llama_flash_attn2_forward_PyramidKV(
 
         # print(f"after self.key_cache[layer_idx] {past_key_value.key_cache[self.layer_idx].device}")
         # print(f"after self.value_states[layer_idx] {past_key_value.value_cache[self.layer_idx].device}")
-        
+    
 
     # TODO: These transpose are quite inefficient but Flash Attention requires the layout [batch_size, sequence_length, num_heads, head_dim]. We would need to refactor the KV cache
     # to be able to avoid many of these transpose/reshape/view.
