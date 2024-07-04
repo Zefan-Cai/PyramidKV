@@ -371,7 +371,7 @@ if __name__ == "__main__":
 
         
 
-    for idx, dataset in enumerate(datasets[8:9]):
+    for idx, dataset in enumerate(datasets):
         
         print(f"Working on max_capacity_prompts {args.max_capacity_prompts} dataset {dataset} - {idx}/{len(datasets)}")
         
