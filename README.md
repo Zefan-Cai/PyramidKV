@@ -24,6 +24,8 @@
 
 - [x] Support multi-GPU inference for 70B LlaMa-3
 
+- [ ] Introduce new functions to support kv cache budget allocation (i.e., supports for percentage.)
+
 - [ ] Support Mixtral
 
 - [ ] Support Batch Inference
