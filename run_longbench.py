@@ -204,12 +204,12 @@ def main(args):
             batch_input_ids = tokenized_prompts.input_ids
             attention_mask = tokenized_prompts.attention_mask
 
-        # default to True
-        if args.method == "DynamicKV":
-            args.output_attentions = True
-        else:
-            args.output_attentions=False
-            
+        # # default to True
+        # if args.method == "DynamicKV":
+        #     args.output_attentions = True
+        # else:
+        #     args.output_attentions=False
+
         if args.max_capacity_prompts != -1:
             max_capacity_prompts = args.max_capacity_prompts
         elif args.max_capacity_prompts_ratio != -1:
@@ -217,14 +217,14 @@ def main(args):
         
         
         if args.method != "FullKV":
-            if args.method.lower() == "pyramidkv":
+            if args.method.lower() == ["snapkv","PyramidKV","h2o"]:
                 window_sizes = 8
-            elif args.method.lower() in ["snapkv","streamingllm","h2o"]:
-                window_sizes = 32
-                
+            elif args.method.lower() in ["streamingllm"]:
+                window_sizes = max_capacity_prompts - 4
+
             kernel_sizes = 7
             pooling = "maxpool"
-            
+
             layers = len(model.model.layers)
             # check if window_sizes is a list
             if not isinstance(window_sizes, list):
