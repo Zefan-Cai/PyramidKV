@@ -240,11 +240,6 @@ def main(args):
                 model.model.layers[i].self_attn.config.pooling = pooling
 
         context_length = batch_input_ids.shape[-1]
-
-        if "llama-3" in args.model_path.lower():
-            eos_token_ids = [tokenizer.eos_token_id, '\n\n']
-        elif "mistral" in args.model_path.lower():
-            eos_token_ids = [tokenizer.eos_token_id]
                 
         output = model.generate(
             **tokenized_prompts,
@@ -254,7 +249,7 @@ def main(args):
             do_sample=False,
             temperature=1.0,
             min_length=context_length+1,
-            eos_token_id=eos_token_ids
+            eos_token_id=[tokenizer.eos_token_id]
         )
 
 
