@@ -60,7 +60,7 @@ class PyramidKVCluster():
             min_num = (self.max_capacity_prompt - self.window_size) * 2 - max_num
     
        
-        steps = (max_num - min_num) // self.num_hidden_layers
+        steps = (max_num - min_num) // (self.num_hidden_layers - 1)
         max_capacity_prompt = max_num - self.layer_idx * steps
         
         print(f"PyramidKV max_capacity_prompt {max_capacity_prompt}")
