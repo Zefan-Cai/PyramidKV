@@ -201,7 +201,7 @@ class H2OKVCluster():
         if q_len < self.max_capacity_prompt:
             return key_states, value_states
         else:
-            attn_weights = torch.matmul(query_states[..., -self.window_size:, :], key_states.transpose(2, 3)) / math.sqrt(head_dim)
+            attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(head_dim)
             mask = torch.full((self.window_size, self.window_size), torch.finfo(attn_weights.dtype).min, device=attn_weights.device)
             mask_cond = torch.arange(mask.size(-1), device=attn_weights.device)
             mask.masked_fill_(mask_cond < (mask_cond + 1).view(mask.size(-1), 1), 0)
