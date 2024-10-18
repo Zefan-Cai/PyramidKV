@@ -176,10 +176,10 @@ to draw the img, you should change `FOLDER_PATH` in `visualize.py` to your outpu
 If you find **PyramidKV** useful for your research and applications, please kindly cite using this BibTeX:
 
 ```latex
-@article{zhang2024pyramidkv,
+@article{cai2024pyramidkv,
   title={PyramidKV: Dynamic KV Cache Compression based on Pyramidal Information Funneling},
-  author={Zhang, Yichi and Gao, Bofei and Liu, Tianyu and Lu, Keming and Xiong, Wayne and Dong, Yue and Chang, Baobao and Hu, Junjie and Xiao, Wen and others},
-  journal={arXiv preprint arXiv:2406.02069},
+  author={Cai, Zefan and Zhang, Yichi and Gao, Bofei and Liu, Yuliang and Liu, Tianyu and Lu, Keming and Xiong, Wayne and Dong, Yue and Chang, Baobao and Hu, Junjie and others},
+  journal={CoRR},
   year={2024}
 }
 ```
