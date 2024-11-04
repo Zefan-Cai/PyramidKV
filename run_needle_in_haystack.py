@@ -161,7 +161,7 @@ class LLMNeedleHaystackTester:
                     ).eval()
 
 
-            if self.method in ["pyramidkv", "snapkv","streamingllm","h2o"]:
+            if self.method in ["pyramidkv", "snapkv","streamingllm","h2o","cam"]:
             
                 if self.model_provider == 'LLaMA3':
                     replace_llama(self.method.lower())
@@ -183,7 +183,7 @@ class LLMNeedleHaystackTester:
                 
                 if self.method.lower() == "pyramidkv":
                     window_sizes = 8
-                elif self.method.lower() in ["snapkv","streamingllm","h2o"]:
+                elif self.method.lower() in ["snapkv","streamingllm","h2o","cam"]:
                     window_sizes = 32
                     
                 kernel_sizes = 7
@@ -505,7 +505,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_provider', type=str, default="LLaMA", help='which model to use')
     parser.add_argument('--api_key', type=str, default="", help='OpenAI API Key')
     parser.add_argument('--step', type=int, default=1000)
-    parser.add_argument('--method', type=str, default="full", choices=['full', 'pyramidkv', 'snapkv', 'streamingllm', 'h2o'])
+    parser.add_argument('--method', type=str, default="full", choices=['full', 'pyramidkv', 'snapkv', 'streamingllm', 'h2o', 'cam'])
     parser.add_argument('--max_capacity_prompt', type=int, default=128)
     args = parser.parse_args()
 
