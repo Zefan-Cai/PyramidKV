@@ -1,0 +1,9 @@
+# 忽略pycache
+__pycache__/
+kv/__pycache__/
+
+# 忽略结果文件夹
+results*/
+attention*/
+others/
+scripts/
