@@ -9,8 +9,8 @@ from pyramidkv.mistral_model import mistral_flash_attn2_forward_PyramidKV,mistra
 from pyramidkv.mistral_model import mistral_attn_forward_PyramidKV,mistral_attn_forward_CAM,mistral_attn_forward_H2O,mistral_attn_forward_SnapKV,mistral_attn_forward_StreamingLLM
 from pyramidkv.mistral_model import mistral_sdpa_attn_forward_PyramidKV,mistral_sdpa_attn_forward_CAM,mistral_sdpa_attn_forward_H2O,mistral_sdpa_attn_forward_SnapKV,mistral_sdpa_attn_forward_StreamingLLM
 
-from pyramidkv.llama_model import prepare_inputs_for_generation_llama
-from pyramidkv.mistral_model import prepare_inputs_for_generation_mistral
+from pyramidkv.llama_model import prepare_inputs_for_generation_llama, prepare_inputs_for_generation_llama_new
+from pyramidkv.mistral_model import prepare_inputs_for_generation_mistral, prepare_inputs_for_generation_mistral_new
 
 
 def replace_llama(method):
@@ -47,7 +47,7 @@ def replace_llama(method):
         
         
     if method not in ["fullkv"]:
-        transformers.models.llama.modeling_llama.LlamaForCausalLM.prepare_inputs_for_generation = prepare_inputs_for_generation_llama
+        transformers.models.llama.modeling_llama.LlamaForCausalLM.prepare_inputs_for_generation = prepare_inputs_for_generation_llama_new
 
 
     
@@ -87,4 +87,4 @@ def replace_mistral(method):
         
         
     if method not in ["fullkv"]:
-        transformers.models.mistral.modeling_mistral.MistralForCausalLM.prepare_inputs_for_generation = prepare_inputs_for_generation_mistral
+        transformers.models.mistral.modeling_mistral.MistralForCausalLM.prepare_inputs_for_generation = prepare_inputs_for_generation_mistral_new
