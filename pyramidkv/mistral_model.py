@@ -159,7 +159,8 @@ def mistral_attn_forward_H2O(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
     if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
@@ -303,7 +304,8 @@ def mistral_sdpa_attn_forward_H2O(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
 
 
 
@@ -452,7 +454,8 @@ def mistral_flash_attn2_forward_H2O(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
         # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
     
@@ -574,7 +577,8 @@ def mistral_attn_forward_CAM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
     if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
@@ -718,7 +722,8 @@ def mistral_sdpa_attn_forward_CAM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
 
 
 
@@ -867,7 +872,8 @@ def mistral_flash_attn2_forward_CAM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
         # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
     
@@ -988,7 +994,8 @@ def mistral_attn_forward_StreamingLLM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
 
 
 
@@ -1138,7 +1145,8 @@ def mistral_sdpa_attn_forward_StreamingLLM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
 
 
 
@@ -1287,7 +1295,8 @@ def mistral_flash_attn2_forward_StreamingLLM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
         # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
     
@@ -1409,7 +1418,8 @@ def mistral_attn_forward_PyramidKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
     if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
@@ -1551,7 +1561,8 @@ def mistral_sdpa_attn_forward_PyramidKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
 
 
     if attention_mask is not None:
@@ -1698,7 +1709,8 @@ def mistral_flash_attn2_forward_PyramidKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
         # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
     
@@ -1816,7 +1828,8 @@ def mistral_attn_forward_SnapKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
 
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
@@ -1961,7 +1974,8 @@ def mistral_sdpa_attn_forward_SnapKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
 
 
     if attention_mask is not None:
@@ -2108,7 +2122,8 @@ def mistral_flash_attn2_forward_SnapKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
+    
         # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
     
@@ -2213,7 +2228,7 @@ def prepare_inputs_for_generation_mistral(
     self, input_ids, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
 ):
     # Omit tokens covered by past_key_values
-    if past_key_values is None:
+    if past_key_values is None or len(past_key_values.key_cache)==0:
         for layer in self.model.layers:
             layer.self_attn.kv_seq_len = 0
     if past_key_values is not None:

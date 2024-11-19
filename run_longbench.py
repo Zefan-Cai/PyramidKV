@@ -240,18 +240,30 @@ def main(args):
                 model.model.layers[i].self_attn.config.pooling = pooling
 
         context_length = batch_input_ids.shape[-1]
-                
-        output = model.generate(
-            **tokenized_prompts,
-            output_attentions = args.output_attentions,
-            max_new_tokens=output_max_len,
-            num_beams=1,
-            do_sample=False,
-            temperature=1.0,
-            min_length=context_length+1,
-            eos_token_id=[tokenizer.eos_token_id]
-        )
-
+        if args.quant_method == None:        
+            output = model.generate(
+                **tokenized_prompts,
+                output_attentions = args.output_attentions,
+                max_new_tokens=output_max_len,
+                num_beams=1,
+                do_sample=False,
+                temperature=1.0,
+                min_length=context_length+1,
+                eos_token_id=[tokenizer.eos_token_id]
+            )
+        else:
+            output = model.generate(
+                **tokenized_prompts,
+                output_attentions = args.output_attentions,
+                max_new_tokens=output_max_len,
+                num_beams=1,
+                do_sample=False,
+                temperature=1.0,
+                min_length=context_length+1,
+                eos_token_id=[tokenizer.eos_token_id],
+                cache_implementation="quantized", 
+                cache_config={"nbits": args.nbits, "backend": "HQQ","device":"cuda","residual_length":output_max_len,"axis_key":1,"q_group_size":64},
+            )
 
         batch_outputs =tokenizer.batch_decode([output[0][context_length:]], skip_special_tokens=True)
         
@@ -307,6 +319,8 @@ if __name__ == "__main__":
     parser.add_argument("--use_cache", type=bool, default=True, help="")
     parser.add_argument("--attn_implementation", type=str,  default="flash_attention_2", choices=["flash_attention_2", "sdpa", "eager"])
     parser.add_argument("--method", type=str,  default=None)
+    parser.add_argument("--quant_method",type=str,default=None,choices=["kivi","kvquant"])
+    parser.add_argument("--nbits", type=int, default=8, help="")
     parser.add_argument("--max_capacity_prompts", type=int, default=512, help="")
     parser.add_argument("--max_capacity_prompts_ratio", type=float, default=-1, help="")
     parser.add_argument("--steps", type=int, default=-1, help="maximum number of examples to evaluate per task.")
@@ -326,8 +340,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     set_seed(args.seed)
-    
-
+    if args.quant_method == "kvquant":
+        from pyramidkv.quantcache import KVQuantizedCache
+        from transformers import cache_utils
+        cache_utils.HQQQuantizedCache = KVQuantizedCache
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_path,
         use_fast=args.use_fast_tokenizer,

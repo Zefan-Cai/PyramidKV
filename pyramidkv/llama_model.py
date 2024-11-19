@@ -168,7 +168,7 @@ def llama_attn_forward_PyramidKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
 
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
@@ -286,7 +286,7 @@ def llama_sdpa_attn_forward_PyramidKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
     causal_mask = attention_mask
     if attention_mask is not None:
         causal_mask = causal_mask[:, :, :, : key_states.shape[-2]]
@@ -400,7 +400,7 @@ def llama_flash_attn2_forward_PyramidKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
         # print(f"after self.key_cache[layer_idx] {past_key_value.key_cache[self.layer_idx].device}")
         # print(f"after self.value_states[layer_idx] {past_key_value.value_cache[self.layer_idx].device}")
     
@@ -537,7 +537,7 @@ def llama_attn_forward_CAM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
 
 
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
@@ -656,7 +656,7 @@ def llama_sdpa_attn_forward_CAM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
 
     causal_mask = attention_mask
     if attention_mask is not None:
@@ -762,7 +762,7 @@ def llama_flash_attn2_forward_CAM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
     # TODO: These transpose are quite inefficient but Flash Attention requires the layout [batch_size, sequence_length, num_heads, head_dim]. We would need to refactor the KV cache
     # to be able to avoid many of these transpose/reshape/view.
     query_states = query_states.transpose(1, 2)
@@ -895,7 +895,7 @@ def llama_attn_forward_H2O(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
 
 
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
@@ -1014,7 +1014,7 @@ def llama_sdpa_attn_forward_H2O(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
 
     causal_mask = attention_mask
     if attention_mask is not None:
@@ -1120,7 +1120,7 @@ def llama_flash_attn2_forward_H2O(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
     # TODO: These transpose are quite inefficient but Flash Attention requires the layout [batch_size, sequence_length, num_heads, head_dim]. We would need to refactor the KV cache
     # to be able to avoid many of these transpose/reshape/view.
     query_states = query_states.transpose(1, 2)
@@ -1253,7 +1253,7 @@ def llama_attn_forward_StreamingLLM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
 
 
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
@@ -1372,7 +1372,7 @@ def llama_sdpa_attn_forward_StreamingLLM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
     causal_mask = attention_mask
     if attention_mask is not None:
         causal_mask = causal_mask[:, :, :, : key_states.shape[-2]]
@@ -1477,7 +1477,7 @@ def llama_flash_attn2_forward_StreamingLLM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
     # TODO: These transpose are quite inefficient but Flash Attention requires the layout [batch_size, sequence_length, num_heads, head_dim]. We would need to refactor the KV cache
     # to be able to avoid many of these transpose/reshape/view.
     query_states = query_states.transpose(1, 2)
@@ -1610,7 +1610,7 @@ def llama_attn_forward_SnapKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
 
 
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
@@ -1729,7 +1729,7 @@ def llama_sdpa_attn_forward_SnapKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
 
     causal_mask = attention_mask
     if attention_mask is not None:
@@ -1835,7 +1835,7 @@ def llama_flash_attn2_forward_SnapKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
+        past_key_value._seen_tokens=self.kv_seq_len
     # TODO: These transpose are quite inefficient but Flash Attention requires the layout [batch_size, sequence_length, num_heads, head_dim]. We would need to refactor the KV cache
     # to be able to avoid many of these transpose/reshape/view.
     query_states = query_states.transpose(1, 2)
@@ -1883,8 +1883,58 @@ def llama_flash_attn2_forward_SnapKV(
     return attn_output, attn_weights, past_key_value
 
 
-from transformers.models.llama.modeling_llama import _prepare_4d_causal_attention_mask_with_cache_position, StaticCache
+from transformers.models.llama.modeling_llama import  StaticCache
+def _prepare_4d_causal_attention_mask_with_cache_position(
+    attention_mask: torch.Tensor,
+    sequence_length: int,
+    target_length: int,
+    dtype: torch.dtype,
+    device: torch.device,
+    min_dtype: float,
+    cache_position: torch.Tensor,
+    batch_size: int,
+):
+    """
+    Creates a causal 4D mask of shape `(batch_size, 1, query_length, key_value_length)` from a 2D mask of shape
+    `(batch_size, key_value_length)`, or if the input `attention_mask` is already 4D, do nothing.
 
+    Args:
+        attention_mask (`torch.Tensor`):
+            A 2D attention mask of shape `(batch_size, key_value_length)` or a 4D attention mask of shape `(batch_size, 1, query_length, key_value_length)`.
+        sequence_length (`int`):
+            The sequence length being processed.
+        target_length (`int`):
+            The target length: when generating with static cache, the mask should be as long as the static cache, to account for the 0 padding, the part of the cache that is not filled yet.
+        dtype (`torch.dtype`):
+            The dtype to use for the 4D attention mask.
+        device (`torch.device`):
+            The device to plcae the 4D attention mask on.
+        min_dtype (`float`):
+            The minimum value representable with the dtype `dtype`.
+        cache_position (`torch.Tensor`):
+            Indices depicting the position of the input sequence tokens in the sequence.
+        batch_size (`torch.Tensor`):
+            Batch size.
+    """
+    if attention_mask is not None and attention_mask.dim() == 4:
+        # In this case we assume that the mask comes already in inverted form and requires no inversion or slicing.
+        causal_mask = attention_mask
+    else:
+        causal_mask = torch.full((sequence_length, target_length), fill_value=min_dtype, dtype=dtype, device=device)
+        if sequence_length != 1:
+            causal_mask = torch.triu(causal_mask, diagonal=1)
+        causal_mask *= torch.arange(target_length, device=device) > cache_position.reshape(-1, 1)
+        causal_mask = causal_mask[None, None, :, :].expand(batch_size, 1, -1, -1)
+        if attention_mask is not None:
+            causal_mask = causal_mask.clone()  # copy to contiguous memory for in-place edit
+            mask_length = attention_mask.shape[-1]
+            padding_mask = causal_mask[:, :, :, :mask_length] + attention_mask[:, None, None, :]
+            padding_mask = padding_mask == 0
+            causal_mask[:, :, :, :mask_length] = causal_mask[:, :, :, :mask_length].masked_fill(
+                padding_mask, min_dtype
+            )
+
+    return causal_mask
 def prepare_inputs_for_generation_llama_new(
         self,
         input_ids,
@@ -1967,7 +2017,7 @@ def prepare_inputs_for_generation_llama(
 ):
     
     
-    if past_key_values is None:
+    if past_key_values is None or len(past_key_values.key_cache) == 0:
         for layer in self.model.layers:
             layer.self_attn.kv_seq_len = 0
     if past_key_values is not None:
