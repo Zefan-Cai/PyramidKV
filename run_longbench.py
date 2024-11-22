@@ -217,7 +217,7 @@ def main(args):
         
         
         if args.method != "FullKV":
-            if args.method.lower() in ["snapkv","pyramidkv","h2o","cam"]:
+            if args.method.lower() in ["snapkv","pyramidkv","h2o","cam", "l2norm"]:
                 window_sizes = 8
             elif args.method.lower() in ["streamingllm"]:
                 window_sizes = max_capacity_prompts - 4
@@ -363,8 +363,6 @@ if __name__ == "__main__":
         use_cache=args.use_cache,
         attn_implementation=args.attn_implementation
     )
-    
-
         
 
     tokenizer.padding_side = "left"
@@ -381,11 +379,6 @@ if __name__ == "__main__":
         
     max_capacity_prompts = args.max_capacity_prompts
     
-
-
-
-        
-
     for idx, dataset in enumerate(datasets):
         
         print(f"Working on max_capacity_prompts {args.max_capacity_prompts} dataset {dataset} - {idx}/{len(datasets)}")
