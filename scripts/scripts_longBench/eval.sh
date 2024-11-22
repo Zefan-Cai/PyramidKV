@@ -5,6 +5,7 @@ max_capacity_prompts=$3 # 128,2048 in paper
 attn_implementation=$4 # Support "flash_attention_2", "sdpa", "eager".
 source_path=$5
 model_path=$6
+merge_method=$7 # Support "pivot"(LOOK-M_PivotMerge).
 save_dir=${source_path}"results_long_bench" # path to result save_dir
 
 python3 run_longbench.py \
@@ -13,6 +14,7 @@ python3 run_longbench.py \
     --max_capacity_prompts ${max_capacity_prompts} \
     --attn_implementation ${attn_implementation} \
     --save_dir ${save_dir} \
+    --merge ${merge_method} \
     --use_cache True
 
 

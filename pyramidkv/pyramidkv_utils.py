@@ -20,9 +20,62 @@ def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
     return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
 
+def merge_kv(key_states, value_states, indices, window_size, merge):
+    # merge methods in LOOK-M 
+
+    bsz, num_heads, k_len, head_dim = key_states.shape
+
+    # kv-selected
+    selected_keys = key_states.gather(dim=2, index=indices)  # [bsz, num_heads, topk_len, head_dim]
+    selected_values = value_states.gather(dim=2, index=indices)  # [bsz, num_heads, topk_len, head_dim]
+
+    # kv-drop
+    all_indices = torch.arange(k_len, device=key_states.device).unsqueeze(0).unsqueeze(0).expand(bsz, num_heads, k_len)
+    all_indices_flattened = all_indices.flatten()  # [bsz * num_heads * (k_len-window_size)]
+    selected_indices_flattened = indices.flatten()  # [bsz * num_heads * topk_len]
+    is_selected = torch.isin(all_indices_flattened, selected_indices_flattened)
+    drop_indices_flattened = all_indices_flattened[~is_selected] 
+    drop_len = drop_indices_flattened.shape[0] // (all_indices.shape[0] * all_indices.shape[1])
+    drop_indices = drop_indices_flattened.reshape(all_indices.shape[0], all_indices.shape[1], drop_len) # [bsz * num_heads * (k_len-window_size-topk_len)]
+    drop_indices = drop_indices.unsqueeze(-1).expand(-1, -1, -1, head_dim)  # [bsz, num_heads, (k_len-window_size-topk_len), head_dim]
+    drop_keys = key_states.gather(dim=2, index=drop_indices)
+    drop_values = value_states.gather(dim=2, index=drop_indices)
+
+    # kv-recent
+    recent_keys = key_states[:, :, -window_size:, :]
+
+    ##### apply merge #####
+    # prepare for merge
+    k_hh_pruned = drop_keys  # [bsz, num_heads, k_len-topk_len-window_size, head_dim]
+    k_hh_recent = torch.cat([recent_keys, selected_keys], dim=2)  # [bsz, num_heads, topk_len+window_size, head_dim]
+    v_hh_pruned = drop_values  # [bsz, num_heads, k_len-topk_len-window_size, head_dim]
+    v_hh_recent = torch.cat([selected_values, value_states[:, :, -window_size:, :]], dim=2)  # [bsz, num_heads, topk_len+window_size, head_dim]
+    # similarity matrix
+    similarity = (k_hh_pruned / torch.norm(k_hh_pruned, dim=-1).unsqueeze(-1).repeat(1, 1, 1, 128)) @ ((k_hh_recent / (torch.norm(k_hh_recent, dim=-1).unsqueeze(-1).repeat(1, 1, 1, 128))).transpose(-1, -2)) # cosin
+    max_values, max_indices = similarity.max(dim=-1)
+
+    # pivot merge
+    if merge=="pivot":
+        print("Pivot merge")
+        merged_indices = max_indices.unsqueeze(-1).repeat(1, 1, 1, 128)
+        k_hh_selected = torch.gather(input=k_hh_recent, dim=2, index=merged_indices)
+        k_hh_merged = (k_hh_pruned + k_hh_selected)/2
+        k_hh_recent = torch.scatter_reduce(input=k_hh_recent, dim=2, index=merged_indices, src=k_hh_merged, reduce='mean', include_self=True) # include_self=True seems decrease the performance
+        v_hh_selected = torch.gather(input=v_hh_recent, dim=2, index=merged_indices)
+        v_hh_merged = (v_hh_pruned + v_hh_selected)/2
+        v_hh_recent = torch.scatter_reduce(input=v_hh_recent, dim=2, index=merged_indices, src=v_hh_merged, reduce='mean', include_self=True)
+    else:
+        raise ValueError('Merge method not supported')
+        
+    # TODO: other merge strategies
+    # average merge
+    # weight merge
+
+    return k_hh_recent, v_hh_recent
+
 
 class PyramidKVCluster():
-    def __init__(self, num_hidden_layers = 32, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', beta = 20, num_layers = 80, layer_idx=None):
+    def __init__(self, num_hidden_layers = 32, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', beta = 20, num_layers = 80, layer_idx=None, merge = None):
         
         self.layer_idx = layer_idx
         self.num_hidden_layers = num_hidden_layers
@@ -35,13 +88,15 @@ class PyramidKVCluster():
         assert self.max_capacity_prompt - self.window_size > 0
         self.kernel_size = kernel_size
         self.pooling = pooling
+        self.merge = merge
 
-    def reset(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def reset(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', merge = None):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
         self.kernel_size = kernel_size
         self.pooling = pooling
+        self.merge = merge
 
     def update_kv(self, key_states, query_states, value_states, attention_mask, num_key_value_groups):
         
@@ -86,6 +141,11 @@ class PyramidKVCluster():
                 raise ValueError('Pooling method not supported')
             indices = attn_cache.topk(self.max_capacity_prompt - self.window_size, dim=-1).indices
             indices = indices.unsqueeze(-1).expand(-1, -1, -1, head_dim)
+            
+            if self.merge is not None:
+                key_states, value_states = merge_kv(key_states, value_states, indices, self.window_size, self.merge)
+                return key_states, value_states
+
             k_past_compress = key_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
             v_past_compress = value_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
             k_cur = key_states[:, :, -self.window_size:, :]
@@ -113,6 +173,11 @@ class PyramidKVCluster():
                 raise ValueError('Pooling method not supported')
             indices = attn_cache.topk(max_capacity_prompt, dim=-1).indices
             indices = indices.unsqueeze(-1).expand(-1, -1, -1, head_dim)
+
+            if self.merge is not None:
+                key_states, value_states = merge_kv(key_states, value_states, indices, self.window_size, self.merge)
+                return key_states, value_states
+
             k_past_compress = key_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
             v_past_compress = value_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
             k_cur = key_states[:, :, -self.window_size:, :]
@@ -122,19 +187,21 @@ class PyramidKVCluster():
             return key_states, value_states
 
 class SnapKVCluster():
-    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', merge = None):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
         self.kernel_size = kernel_size
         self.pooling = pooling
+        self.merge = merge
 
-    def reset(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def reset(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', merge = None):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
         self.kernel_size = kernel_size
         self.pooling = pooling
+        self.merge = merge
 
     def update_kv(self, key_states, query_states, value_states, attention_mask, num_key_value_groups):
         
@@ -166,6 +233,11 @@ class SnapKVCluster():
                 raise ValueError('Pooling method not supported')
             indices = attn_cache.topk(self.max_capacity_prompt - self.window_size, dim=-1).indices
             indices = indices.unsqueeze(-1).expand(-1, -1, -1, head_dim)
+
+            if self.merge is not None:
+                key_states, value_states = merge_kv(key_states, value_states, indices, self.window_size, self.merge)
+                return key_states, value_states
+
             k_past_compress = key_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
             v_past_compress = value_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
             k_cur = key_states[:, :, -self.window_size:, :]
@@ -176,21 +248,23 @@ class SnapKVCluster():
 
 
 class CAMKVCluster:
-    def __init__(self, start_budget_ratio = 0.1, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def __init__(self, start_budget_ratio = 0.1, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', merge = None):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
         self.kernel_size = kernel_size
         self.pooling = pooling
         self.start_budget_ratio = start_budget_ratio
+        self.merge = merge
 
-    def reset(self, start_budget_ratio = 0.1, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def reset(self, start_budget_ratio = 0.1, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', merge = None):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
         self.kernel_size = kernel_size
         self.pooling = pooling
         self.start_budget_ratio = start_budget_ratio
+        self.merge = merge
 
     def update_kv(self, key_states, query_states, value_states, attention_mask, num_key_value_groups):
         
@@ -258,19 +332,21 @@ class CAMKVCluster:
 
 
 class H2OKVCluster():
-    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', merge = None):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
         self.kernel_size = kernel_size
         self.pooling = pooling
+        self.merge = merge
 
-    def reset(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def reset(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', merge = None):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
         self.kernel_size = kernel_size
         self.pooling = pooling
+        self.merge = merge
 
     def update_kv(self, key_states, query_states, value_states, attention_mask, num_key_value_groups):
         
@@ -303,6 +379,11 @@ class H2OKVCluster():
             attn_cache = attn_weights_sum
             indices = attn_cache.topk(self.max_capacity_prompt - self.window_size, dim=-1).indices
             indices = indices.unsqueeze(-1).expand(-1, -1, -1, head_dim)
+
+            if self.merge is not None:
+                key_states, value_states = merge_kv(key_states, value_states, indices, self.window_size, self.merge)
+                return key_states, value_states
+
             k_past_compress = key_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
             v_past_compress = value_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
             k_cur = key_states[:, :, -self.window_size:, :]
@@ -313,19 +394,21 @@ class H2OKVCluster():
 
 
 class StreamingLLMKVCluster():
-    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def __init__(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', merge = None):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
         self.kernel_size = kernel_size
         self.pooling = pooling
+        self.merge = merge
 
-    def reset(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool'):
+    def reset(self, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', merge = None):
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
         self.kernel_size = kernel_size
         self.pooling = pooling
+        self.merge = merge
 
     def update_kv(self, key_states, query_states, value_states, attention_mask, num_key_value_groups):
         
@@ -362,6 +445,10 @@ class StreamingLLMKVCluster():
             indices = torch.tensor(range(self.max_capacity_prompt - self.window_size), dtype=torch.int64).to(key_states.device)
             indices = indices.unsqueeze(0).unsqueeze(0).unsqueeze(-1).repeat(bsz, num_heads, 1, head_dim)
 
+            if self.merge is not None:
+                key_states, value_states = merge_kv(key_states, value_states, indices, self.window_size, self.merge)
+                return key_states, value_states
+
             k_past_compress = key_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
             v_past_compress = value_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
             k_cur = key_states[:, :, -self.window_size:, :]
@@ -381,6 +468,8 @@ def init_pyramidkv(self, num_hidden_layers):
             self.config.kernel_size = 5
         if not hasattr(self.config, 'pooling'):
             self.config.pooling = 'avgpool'
+        if not hasattr(self.config, 'merge'):
+            self.config.merge = None
     
     
     self.kv_cluster = PyramidKVCluster( 
@@ -389,7 +478,8 @@ def init_pyramidkv(self, num_hidden_layers):
         window_size = self.config.window_size, 
         max_capacity_prompt = self.config.max_capacity_prompt, 
         kernel_size = self.config.kernel_size,
-        pooling = self.config.pooling
+        pooling = self.config.pooling,
+        merge = self.config.merge,
         )
  
 def init_snapkv(self):
@@ -402,13 +492,16 @@ def init_snapkv(self):
             self.config.kernel_size = 5
         if not hasattr(self.config, 'pooling'):
             self.config.pooling = 'avgpool'
+        if not hasattr(self.config, 'merge'):
+            self.config.merge = None
     
     
     self.kv_cluster = SnapKVCluster( 
         window_size = self.config.window_size, 
         max_capacity_prompt = self.config.max_capacity_prompt, 
         kernel_size = self.config.kernel_size,
-        pooling = self.config.pooling
+        pooling = self.config.pooling,
+        merge = self.config.merge,
         )
 
 def init_CAM(self):
@@ -427,7 +520,8 @@ def init_CAM(self):
         window_size = self.config.window_size, 
         max_capacity_prompt = self.config.max_capacity_prompt, 
         kernel_size = self.config.kernel_size,
-        pooling = self.config.pooling
+        pooling = self.config.pooling,
+        merge = self.config.merge,
         )
 
 def init_H2O(self):
@@ -440,13 +534,15 @@ def init_H2O(self):
             self.config.kernel_size = 5
         if not hasattr(self.config, 'pooling'):
             self.config.pooling = 'avgpool'
-    
+        if not hasattr(self.config, 'merge'):
+            self.config.merge = None
     
     self.kv_cluster = H2OKVCluster(
         window_size = self.config.window_size, 
         max_capacity_prompt = self.config.max_capacity_prompt, 
         kernel_size = self.config.kernel_size,
-        pooling = self.config.pooling
+        pooling = self.config.pooling,
+        merge = self.config.merge,
         )
 
 def init_StreamingLLM(self):
@@ -459,11 +555,14 @@ def init_StreamingLLM(self):
             self.config.kernel_size = 5
         if not hasattr(self.config, 'pooling'):
             self.config.pooling = 'avgpool'
+        if not hasattr(self.config, 'merge'):
+            self.config.merge = None
     
     
     self.kv_cluster = StreamingLLMKVCluster(
         window_size = self.config.window_size, 
         max_capacity_prompt = self.config.max_capacity_prompt, 
         kernel_size = self.config.kernel_size,
-        pooling = self.config.pooling
+        pooling = self.config.pooling,
+        merge = self.config.merge,
         )
