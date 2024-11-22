@@ -208,8 +208,8 @@ class L2NormCluster():
             sorted_key_states = key_states.gather(dim=2, index=sorted_indices_expanded)
             sorted_value_states = value_states.gather(dim=2, index=sorted_indices_expanded)
             
-            key_states = sorted_key_states[:, :, -self.max_capacity_prompt:, :]
-            value_states = sorted_value_states[:, :, -self.max_capacity_prompt:, :]
+            key_states = sorted_key_states[:, :, :self.max_capacity_prompt, :]
+            value_states = sorted_value_states[:, :, :self.max_capacity_prompt, :]
 
             return key_states, value_states
 
