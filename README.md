@@ -177,9 +177,9 @@ If you find **PyramidKV** useful for your research and applications, please kind
 
 ```latex
 @article{cai2024pyramidkv,
-  title={PyramidKV: Dynamic KV Cache Compression based on Pyramidal Information Funneling},
-  author={Cai, Zefan and Zhang, Yichi and Gao, Bofei and Liu, Yuliang and Liu, Tianyu and Lu, Keming and Xiong, Wayne and Dong, Yue and Chang, Baobao and Hu, Junjie and Xiao, Wen},
-  journal={CoRR},
+  title={Pyramidkv: Dynamic kv cache compression based on pyramidal information funneling},
+  author={Cai, Zefan and Zhang, Yichi and Gao, Bofei and Liu, Yuliang and Liu, Tianyu and Lu, Keming and Xiong, Wayne and Dong, Yue and Chang, Baobao and Hu, Junjie and Xiao Wen},
+  journal={arXiv preprint arXiv:2406.02069},
   year={2024}
 }
 ```
