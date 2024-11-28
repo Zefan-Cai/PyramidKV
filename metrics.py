@@ -142,3 +142,12 @@ def qa_f1_zh_score(prediction, ground_truth, **kwargs):
     prediction_tokens = [token for token in prediction_tokens if len(token) > 0]
     ground_truth_tokens = [token for token in ground_truth_tokens if len(token) > 0]
     return f1_score(prediction_tokens, ground_truth_tokens)
+
+def string_match_all(preds, refs):
+    """
+    evaluation metric for RULER
+    preds: List[str]
+    refs: List[List[str]]
+    """
+    score = sum([sum([1.0 if r.lower() in pred.lower() else 0.0 for r in ref]) / len(ref) for pred, ref in zip(preds, refs)]) / len(preds) * 100
+    return round(score, 2)
