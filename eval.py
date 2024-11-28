@@ -104,13 +104,14 @@ if __name__ == '__main__':
         ["StreamingLLM"],
         ["H2O"],
         ["PyramidKV"],
+        ["CAM"],
     ]
     
     for dataset in dataset_list:
         
         results_list[0].append(dataset)
         
-        for idx, method in enumerate(["FullKV", "random", "SnapKV", "StreamingLLM", "H2O", "PyramidKV"]):
+        for idx, method in enumerate(["FullKV", "random", "SnapKV", "StreamingLLM", "H2O", "PyramidKV","CAM"]):
         # for idx, method in enumerate(["H2_global", "PyramidKV_global", "local"]):
             try:
                 args.method = method

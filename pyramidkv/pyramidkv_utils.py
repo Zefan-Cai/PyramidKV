@@ -295,14 +295,6 @@ class CAMKVCluster:
             # else:
             #     raise ValueError('Pooling method not supported')
             attn_cache = attn_weights_sum
-            indices = attn_cache.topk(self.max_capacity_prompt - self.window_size, dim=-1).indices
-            indices = indices.unsqueeze(-1).expand(-1, -1, -1, head_dim)
-            k_past_compress = key_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
-            v_past_compress = value_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
-            k_cur = key_states[:, :, -self.window_size:, :]
-            v_cur = value_states[:, :, -self.window_size:, :]
-            key_states = torch.cat([k_past_compress, k_cur], dim = 2)
-            value_states = torch.cat([v_past_compress, v_cur], dim = 2)
 
             # merge recent tokens
             start_budget = math.ceil(self.start_budget_ratio * q_len)
@@ -327,6 +319,15 @@ class CAMKVCluster:
                 merge_mask = torch.bernoulli(merge_prob.clamp(min=0, max=1))
                 score1 = value_states[:, :, token_index - recent_budget, ...].clone() * merge_mask.unsqueeze(-1) / merge_budget
                 value_states[:, :, token_index - recent_budget + 1:token_index - recent_budget + merge_budget + 1, :] += score1.unsqueeze(2)
+
+            indices = attn_cache.topk(self.max_capacity_prompt - self.window_size, dim=-1).indices
+            indices = indices.unsqueeze(-1).expand(-1, -1, -1, head_dim)
+            k_past_compress = key_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
+            v_past_compress = value_states[:, :, :-self.window_size, :].gather(dim = 2, index = indices)
+            k_cur = key_states[:, :, -self.window_size:, :]
+            v_cur = value_states[:, :, -self.window_size:, :]
+            key_states = torch.cat([k_past_compress, k_cur], dim = 2)
+            value_states = torch.cat([v_past_compress, v_cur], dim = 2)
 
             return key_states, value_states
 
