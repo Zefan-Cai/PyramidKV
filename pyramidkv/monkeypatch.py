@@ -13,7 +13,7 @@ from pyramidkv.llama_model import prepare_inputs_for_generation_llama, prepare_i
 from pyramidkv.mistral_model import prepare_inputs_for_generation_mistral, prepare_inputs_for_generation_mistral_new
 
 
-def replace_llama(method):
+def replace_llama(method, model_name=None):
    
     if method == "pyramidkv":
         print("Using PyramidKV!")
@@ -45,6 +45,15 @@ def replace_llama(method):
         transformers.models.llama.modeling_llama.LlamaFlashAttention2.forward = llama_flash_attn2_forward_SnapKV
         transformers.models.llama.modeling_llama.LlamaSdpaAttention.forward = llama_sdpa_attn_forward_SnapKV
     
+    elif method == "minference":
+        print("Using MInference!")
+        from .minference import minference_attn_forward, init_minference
+        init_minference(model_name)
+        transformers.models.llama.modeling_llama.LlamaForCausalLM.prepare_inputs_for_generation = prepare_inputs_for_generation_llama_new
+        transformers.models.llama.modeling_llama.LlamaAttention.forward = minference_attn_forward
+        transformers.models.llama.modeling_llama.LlamaFlashAttention2.forward = minference_attn_forward
+        transformers.models.llama.modeling_llama.LlamaSdpaAttention.forward = minference_attn_forward
+        
     elif method == "l2norm":
         print("Using L2Norm!")
         transformers.models.llama.modeling_llama.LlamaAttention.forward = llama_attn_forward_L2Norm
@@ -53,7 +62,6 @@ def replace_llama(method):
         
     if method not in ["fullkv"]:
         transformers.models.llama.modeling_llama.LlamaForCausalLM.prepare_inputs_for_generation = prepare_inputs_for_generation_llama_new
-
 
     
 
