@@ -1,12 +1,12 @@
-# Pyramid KV
+# 
+
+![# KVCache-Facroty](assets/logo.pdf)
 
 
-
-<p align="center">
-    <img src="figs/PyramidKV.png" width="100%"> <br>
-</p>
 
 ## News
+
+- [2024-11-28] Çhange the name to KVCache-Factory! The target of our project is now a unified framework of KV Cache compression of diverse models.
 
 - [2024-06-25] Support multi-GPUs inference with big LLMs now! Try out PyramidKV on LlaMa-3-70B-Instruct!
 
@@ -180,6 +180,15 @@ If you find **PyramidKV** useful for your research and applications, please kind
   title={Pyramidkv: Dynamic kv cache compression based on pyramidal information funneling},
   author={Cai, Zefan and Zhang, Yichi and Gao, Bofei and Liu, Yuliang and Liu, Tianyu and Lu, Keming and Xiong, Wayne and Dong, Yue and Chang, Baobao and Hu, Junjie and Xiao Wen},
   journal={arXiv preprint arXiv:2406.02069},
+  year={2024}
+}
+```
+
+```latex
+@article{fu2024not,
+  title={Not All Heads Matter: A Head-Level KV Cache Compression Method with Integrated Retrieval and Reasoning},
+  author={Fu, Yu and Cai, Zefan and Asi, Abedelkadir and Xiong, Wayne and Dong, Yue and Xiao, Wen},
+  journal={arXiv preprint arXiv:2410.19258},
   year={2024}
 }
 ```
