@@ -238,6 +238,7 @@ def main(args):
                 model.model.layers[i].self_attn.config.max_capacity_prompt = max_capacity_prompts[i]
                 model.model.layers[i].self_attn.config.kernel_size = kernel_sizes[i]
                 model.model.layers[i].self_attn.config.pooling = pooling
+                model.model.layers[i].self_attn.config.merge = args.merge
 
         context_length = batch_input_ids.shape[-1]
         if args.quant_method == None:        
@@ -324,6 +325,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_capacity_prompts", type=int, default=512, help="")
     parser.add_argument("--max_capacity_prompts_ratio", type=float, default=-1, help="")
     parser.add_argument("--steps", type=int, default=-1, help="maximum number of examples to evaluate per task.")
+    parser.add_argument("--merge", type=str, default=None, help="kv merge method(look-m)")
     
     parser.add_argument(
         "--use_chat_format", 
