@@ -217,7 +217,7 @@ def main(args):
         
         
         if args.method != "FullKV":
-            if args.method.lower() in ["snapkv","pyramidkv","h2o","cam"]:
+            if args.method.lower() in ["snapkv","pyramidkv","h2o","cam", "l2norm"]:
                 window_sizes = 8
             elif args.method.lower() in ["streamingllm"]:
                 window_sizes = max_capacity_prompts - 4
@@ -238,6 +238,7 @@ def main(args):
                 model.model.layers[i].self_attn.config.max_capacity_prompt = max_capacity_prompts[i]
                 model.model.layers[i].self_attn.config.kernel_size = kernel_sizes[i]
                 model.model.layers[i].self_attn.config.pooling = pooling
+                model.model.layers[i].self_attn.config.merge = args.merge
 
         context_length = batch_input_ids.shape[-1]
         if args.quant_method == None:        
@@ -324,6 +325,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_capacity_prompts", type=int, default=512, help="")
     parser.add_argument("--max_capacity_prompts_ratio", type=float, default=-1, help="")
     parser.add_argument("--steps", type=int, default=-1, help="maximum number of examples to evaluate per task.")
+    parser.add_argument("--merge", type=str, default=None, help="kv merge method(look-m)")
     
     parser.add_argument(
         "--use_chat_format", 
@@ -363,8 +365,6 @@ if __name__ == "__main__":
         use_cache=args.use_cache,
         attn_implementation=args.attn_implementation
     )
-    
-
         
 
     tokenizer.padding_side = "left"
@@ -381,11 +381,6 @@ if __name__ == "__main__":
         
     max_capacity_prompts = args.max_capacity_prompts
     
-
-
-
-        
-
     for idx, dataset in enumerate(datasets):
         
         print(f"Working on max_capacity_prompts {args.max_capacity_prompts} dataset {dataset} - {idx}/{len(datasets)}")
