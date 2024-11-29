@@ -340,7 +340,7 @@ if __name__ == "__main__":
     parser.add_argument("--steps", type=int, default=-1, help="maximum number of examples to evaluate per task.")
     parser.add_argument("--merge", type=str, default=None, help="kv merge method(look-m)")
     parser.add_argument('--floor', type=float, default=0.2, help='hyper-parameter used in AdaKV')
-    parser.add_argument('--head_path', type=str, default=None, help='Path to head score (HeadKV)')
+    parser.add_argument('--head_path', type=str, default='./data/heads_score/Meta-Llama-3-8B-Instruct_retrieval_reasoning_heads.json', help='Path to head score (HeadKV)')
     parser.add_argument('--head_beta', type=float, default=1.01, help='hyper-parameter used on HeadKV')
 
     parser.add_argument(
