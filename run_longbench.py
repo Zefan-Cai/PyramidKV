@@ -217,10 +217,21 @@ def main(args):
         
         
         if args.method != "FullKV":
-            if args.method.lower() in ["snapkv","pyramidkv","h2o","cam", "l2norm"]:
+            if args.method.lower() in ["snapkv","pyramidkv","h2o","cam", "l2norm", "adakv", "headkv"]:
                 window_sizes = 8
             elif args.method.lower() in ["streamingllm"]:
                 window_sizes = max_capacity_prompts - 4
+
+            if args.method.lower() =='headkv':
+                with open(args.head_path, 'r') as file:
+                    head_list = json.loads(file.readline())
+                head_score_list = [np.mean(l[1]) for l in head_list.items()]
+                head_score_list = torch.tensor(head_score_list / sum(head_score_list))
+                total_attention = head_score_list.reshape(model.config.num_hidden_layers, model.config.num_attention_heads)
+                total_pool_capacity = (args.max_capacity_prompts // args.head_beta) * model.config.num_hidden_layers * model.config.num_attention_heads
+                min_num = (args.max_capacity_prompts - args.max_capacity_prompts // args.head_beta)
+                head_capacity = torch.round(total_attention * total_pool_capacity + min_num).int()
+                model.model.config.head_capacity = head_capacity    
 
             kernel_sizes = 7
             pooling = "maxpool"
@@ -239,6 +250,8 @@ def main(args):
                 model.model.layers[i].self_attn.config.kernel_size = kernel_sizes[i]
                 model.model.layers[i].self_attn.config.pooling = pooling
                 model.model.layers[i].self_attn.config.merge = args.merge
+                model.model.layers[i].self_attn.config.floor = args.floor
+            
 
         context_length = batch_input_ids.shape[-1]
         if args.quant_method == None:        
@@ -290,7 +303,7 @@ def main(args):
             example["all_classes"] = batch_all_classess[j]
             example["_id"] = batch__ids[j]
 
-
+            # print(f'{batch_generations[j]}')
             fout.write(json.dumps(example) + "\n")
     
     
@@ -326,7 +339,10 @@ if __name__ == "__main__":
     parser.add_argument("--max_capacity_prompts_ratio", type=float, default=-1, help="")
     parser.add_argument("--steps", type=int, default=-1, help="maximum number of examples to evaluate per task.")
     parser.add_argument("--merge", type=str, default=None, help="kv merge method(look-m)")
-    
+    parser.add_argument('--floor', type=float, default=0.2, help='hyper-parameter used in AdaKV')
+    parser.add_argument('--head_path', type=str, default=None, help='Path to head score (HeadKV)')
+    parser.add_argument('--head_beta', type=float, default=1.01, help='hyper-parameter used on HeadKV')
+
     parser.add_argument(
         "--use_chat_format", 
         action="store_true", 

@@ -1,0 +1,217 @@
+nohup: ignoring input
+python build.py install
+running install
+/home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages/setuptools/_distutils/cmd.py:66: SetuptoolsDeprecationWarning: setup.py install is deprecated.
+!!
+
+        ********************************************************************************
+        Please avoid running ``setup.py`` directly.
+        Instead, use pypa/build, pypa/installer or other
+        standards-based tools.
+
+        See https://blog.ganssle.io/articles/2021/10/setup-py-deprecated.html for details.
+        ********************************************************************************
+
+!!
+  self.initialize_options()
+/home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages/setuptools/_distutils/cmd.py:66: EasyInstallDeprecationWarning: easy_install command is deprecated.
+!!
+
+        ********************************************************************************
+        Please avoid running ``setup.py`` and ``easy_install``.
+        Instead, use pypa/build, pypa/installer or other
+        standards-based tools.
+
+        See https://github.com/pypa/setuptools/issues/917 for details.
+        ********************************************************************************
+
+!!
+  self.initialize_options()
+running bdist_egg
+running egg_info
+writing tiny_pkg.egg-info/PKG-INFO
+writing dependency_links to tiny_pkg.egg-info/dependency_links.txt
+writing requirements to tiny_pkg.egg-info/requires.txt
+writing top-level names to tiny_pkg.egg-info/top_level.txt
+reading manifest file 'tiny_pkg.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'tiny_pkg.egg-info/SOURCES.txt'
+installing library code to build/bdist.linux-x86_64/egg
+running install_lib
+running build_ext
+/home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages/torch/utils/cpp_extension.py:426: UserWarning: There are no g++ version bounds defined for CUDA version 12.4
+  warnings.warn(f'There are no {compiler_name} version bounds defined for CUDA version {cuda_str_version}')
+building 'tiny_api_cuda' extension
+Emitting ninja build file /data/yfu093/github_project/KVCache-Factory/csrc/build/temp.linux-x86_64-cpython-310/build.ninja...
+Compiling objects...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+[1/1] /usr/bin/nvcc --generate-dependencies-with-compile --dependency-output /data/yfu093/github_project/KVCache-Factory/csrc/build/temp.linux-x86_64-cpython-310/csrc/cuda_api.o.d -I/data/yfu093/github_project/KVCache-Factory/csrc/csrc -I/data/yfu093/github_project/KVCache-Factory/csrc/include -I/home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages/torch/include -I/home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages/torch/include/TH -I/home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages/torch/include/THC -I/home/yfu093/anaconda3/envs/kv_test/include/python3.10 -c -c /data/yfu093/github_project/KVCache-Factory/csrc/csrc/cuda_api.cu -o /data/yfu093/github_project/KVCache-Factory/csrc/build/temp.linux-x86_64-cpython-310/csrc/cuda_api.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -O3 -std=c++17 -U__CUDA_NO_HALF_OPERATORS__ --use_fast_math -lineinfo --ptxas-options=-v --ptxas-options=-O2 -U__CUDA_NO_HALF_OPERATORS__ -U__CUDA_NO_HALF_CONVERSIONS__ -U__CUDA_NO_HALF2_OPERATORS__ -U__CUDA_NO_BFLOAT16_CONVERSIONS__ --expt-relaxed-constexpr --expt-extended-lambda --use_fast_math -gencode arch=compute_80,code=sm_80 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=tiny_api_cuda -D_GLIBCXX_USE_CXX11_ABI=0
+ptxas info    : 3 bytes gmem, 24 bytes cmem[4]
+ptxas info    : Compiling entry function '_Z26update_flatten_view_kernelIN3c108BFloat16ELi1EEvPT_S3_S3_PiS4_i' for 'sm_80'
+ptxas info    : Function properties for _Z26update_flatten_view_kernelIN3c108BFloat16ELi1EEvPT_S3_S3_PiS4_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 17 registers, 396 bytes cmem[0]
+ptxas info    : Compiling entry function '_Z26update_flatten_view_kernelIN3c104HalfELi1EEvPT_S3_S3_PiS4_i' for 'sm_80'
+ptxas info    : Function properties for _Z26update_flatten_view_kernelIN3c104HalfELi1EEvPT_S3_S3_PiS4_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 17 registers, 396 bytes cmem[0]
+creating build/lib.linux-x86_64-cpython-310
+g++ -pthread -B /home/yfu093/anaconda3/envs/kv_test/compiler_compat -Wno-unused-result -Wsign-compare -DNDEBUG -fwrapv -O2 -Wall -fPIC -O2 -isystem /home/yfu093/anaconda3/envs/kv_test/include -fPIC -O2 -isystem /home/yfu093/anaconda3/envs/kv_test/include -pthread -B /home/yfu093/anaconda3/envs/kv_test/compiler_compat -shared /data/yfu093/github_project/KVCache-Factory/csrc/build/temp.linux-x86_64-cpython-310/csrc/cuda_api.o -L/home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages/torch/lib -L/usr/lib64 -lc10 -ltorch -ltorch_cpu -ltorch_python -lcudart -lc10_cuda -ltorch_cuda -o build/lib.linux-x86_64-cpython-310/tiny_api_cuda.cpython-310-x86_64-linux-gnu.so
+creating build/bdist.linux-x86_64/egg
+copying build/lib.linux-x86_64-cpython-310/tiny_api_cuda.cpython-310-x86_64-linux-gnu.so -> build/bdist.linux-x86_64/egg
+creating stub loader for tiny_api_cuda.cpython-310-x86_64-linux-gnu.so
+byte-compiling build/bdist.linux-x86_64/egg/tiny_api_cuda.py to tiny_api_cuda.cpython-310.pyc
+creating build/bdist.linux-x86_64/egg/EGG-INFO
+copying tiny_pkg.egg-info/PKG-INFO -> build/bdist.linux-x86_64/egg/EGG-INFO
+copying tiny_pkg.egg-info/SOURCES.txt -> build/bdist.linux-x86_64/egg/EGG-INFO
+copying tiny_pkg.egg-info/dependency_links.txt -> build/bdist.linux-x86_64/egg/EGG-INFO
+copying tiny_pkg.egg-info/requires.txt -> build/bdist.linux-x86_64/egg/EGG-INFO
+copying tiny_pkg.egg-info/top_level.txt -> build/bdist.linux-x86_64/egg/EGG-INFO
+writing build/bdist.linux-x86_64/egg/EGG-INFO/native_libs.txt
+zip_safe flag not set; analyzing archive contents...
+__pycache__.tiny_api_cuda.cpython-310: module references __file__
+creating 'dist/tiny_pkg-0.0.0-py3.10-linux-x86_64.egg' and adding 'build/bdist.linux-x86_64/egg' to it
+removing 'build/bdist.linux-x86_64/egg' (and everything under it)
+Processing tiny_pkg-0.0.0-py3.10-linux-x86_64.egg
+creating /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages/tiny_pkg-0.0.0-py3.10-linux-x86_64.egg
+Extracting tiny_pkg-0.0.0-py3.10-linux-x86_64.egg to /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Adding tiny-pkg 0.0.0 to easy-install.pth file
+
+Installed /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages/tiny_pkg-0.0.0-py3.10-linux-x86_64.egg
+Processing dependencies for tiny-pkg==0.0.0
+Searching for ninja==1.11.1.1
+Best match: ninja 1.11.1.1
+Adding ninja 1.11.1.1 to easy-install.pth file
+detected new path './tiny_pkg-0.0.0-py3.10-linux-x86_64.egg'
+Installing ninja script to /home/yfu093/anaconda3/envs/kv_test/bin
+
+Using /home/yfu093/.local/lib/python3.10/site-packages
+Searching for packaging==24.2
+Best match: packaging 24.2
+Adding packaging 24.2 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for einops==0.8.0
+Best match: einops 0.8.0
+Adding einops 0.8.0 to easy-install.pth file
+
+Using /home/yfu093/.local/lib/python3.10/site-packages
+Searching for torch==2.5.1
+Best match: torch 2.5.1
+Adding torch 2.5.1 to easy-install.pth file
+Installing convert-caffe2-to-onnx script to /home/yfu093/anaconda3/envs/kv_test/bin
+Installing convert-onnx-to-caffe2 script to /home/yfu093/anaconda3/envs/kv_test/bin
+Installing torchfrtrace script to /home/yfu093/anaconda3/envs/kv_test/bin
+Installing torchrun script to /home/yfu093/anaconda3/envs/kv_test/bin
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for sympy==1.13.1
+Best match: sympy 1.13.1
+Adding sympy 1.13.1 to easy-install.pth file
+Installing isympy script to /home/yfu093/anaconda3/envs/kv_test/bin
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for triton==3.1.0
+Best match: triton 3.1.0
+Adding triton 3.1.0 to easy-install.pth file
+Installing proton script to /home/yfu093/anaconda3/envs/kv_test/bin
+Installing proton-viewer script to /home/yfu093/anaconda3/envs/kv_test/bin
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for nvidia-nvjitlink-cu12==12.4.127
+Best match: nvidia-nvjitlink-cu12 12.4.127
+Adding nvidia-nvjitlink-cu12 12.4.127 to easy-install.pth file
+
+Using /home/yfu093/.local/lib/python3.10/site-packages
+Searching for nvidia-nvtx-cu12==12.4.127
+Best match: nvidia-nvtx-cu12 12.4.127
+Adding nvidia-nvtx-cu12 12.4.127 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for nvidia-nccl-cu12==2.21.5
+Best match: nvidia-nccl-cu12 2.21.5
+Adding nvidia-nccl-cu12 2.21.5 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for nvidia-cusparse-cu12==12.3.1.170
+Best match: nvidia-cusparse-cu12 12.3.1.170
+Adding nvidia-cusparse-cu12 12.3.1.170 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for nvidia-cusolver-cu12==11.6.1.9
+Best match: nvidia-cusolver-cu12 11.6.1.9
+Adding nvidia-cusolver-cu12 11.6.1.9 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for nvidia-curand-cu12==10.3.5.147
+Best match: nvidia-curand-cu12 10.3.5.147
+Adding nvidia-curand-cu12 10.3.5.147 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for nvidia-cufft-cu12==11.2.1.3
+Best match: nvidia-cufft-cu12 11.2.1.3
+Adding nvidia-cufft-cu12 11.2.1.3 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for nvidia-cublas-cu12==12.4.5.8
+Best match: nvidia-cublas-cu12 12.4.5.8
+Adding nvidia-cublas-cu12 12.4.5.8 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for nvidia-cudnn-cu12==9.1.0.70
+Best match: nvidia-cudnn-cu12 9.1.0.70
+Adding nvidia-cudnn-cu12 9.1.0.70 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for nvidia-cuda-cupti-cu12==12.4.127
+Best match: nvidia-cuda-cupti-cu12 12.4.127
+Adding nvidia-cuda-cupti-cu12 12.4.127 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for nvidia-cuda-runtime-cu12==12.4.127
+Best match: nvidia-cuda-runtime-cu12 12.4.127
+Adding nvidia-cuda-runtime-cu12 12.4.127 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for nvidia-cuda-nvrtc-cu12==12.4.127
+Best match: nvidia-cuda-nvrtc-cu12 12.4.127
+Adding nvidia-cuda-nvrtc-cu12 12.4.127 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for fsspec==2023.6.0
+Best match: fsspec 2023.6.0
+Adding fsspec 2023.6.0 to easy-install.pth file
+
+Using /home/yfu093/.local/lib/python3.10/site-packages
+Searching for jinja2==3.1.4
+Best match: jinja2 3.1.4
+Adding jinja2 3.1.4 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for networkx==3.4.2
+Best match: networkx 3.4.2
+Adding networkx 3.4.2 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for typing-extensions==4.12.2
+Best match: typing-extensions 4.12.2
+Adding typing-extensions 4.12.2 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages/setuptools/_vendor
+Searching for filelock==3.16.1
+Best match: filelock 3.16.1
+Adding filelock 3.16.1 to easy-install.pth file
+detected new path './setuptools/_vendor'
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for mpmath==1.3.0
+Best match: mpmath 1.3.0
+Adding mpmath 1.3.0 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Searching for MarkupSafe==3.0.2
+Best match: MarkupSafe 3.0.2
+Adding MarkupSafe 3.0.2 to easy-install.pth file
+
+Using /home/yfu093/anaconda3/envs/kv_test/lib/python3.10/site-packages
+Finished processing dependencies for tiny-pkg==0.0.0

@@ -1,0 +1,4 @@
+build/
+deps/
+tiny_pkg.egg-info/
+test.py
