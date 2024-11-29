@@ -1,6 +1,4 @@
-# 
-
-![# KVCache-Facroty](assets/logo.pdf)
+![# KVCache-Facroty](assets/logo.png)
 
 
 
