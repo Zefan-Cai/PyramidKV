@@ -276,17 +276,8 @@ def mistral_sdpa_attn_forward_H2O(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-<<<<<<< HEAD
 
     causal_mask = attention_mask
-=======
-        past_key_value._seen_tokens=self.kv_seq_len
-    
-
-
-
-
->>>>>>> 6b683d4a8387a779540932c6b561596f034fd7ca
     if attention_mask is not None:
         causal_mask = causal_mask[:, :, :, : key_states.shape[-2]]
 
@@ -1069,17 +1060,8 @@ def mistral_sdpa_attn_forward_CAM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-<<<<<<< HEAD
 
     causal_mask = attention_mask
-=======
-        past_key_value._seen_tokens=self.kv_seq_len
-    
-
-
-
-
->>>>>>> 6b683d4a8387a779540932c6b561596f034fd7ca
     if attention_mask is not None:
         causal_mask = causal_mask[:, :, :, : key_states.shape[-2]]
 
@@ -1314,13 +1296,6 @@ def mistral_attn_forward_StreamingLLM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-<<<<<<< HEAD
-=======
-        past_key_value._seen_tokens=self.kv_seq_len
-    
-
-
->>>>>>> 6b683d4a8387a779540932c6b561596f034fd7ca
 
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
@@ -1449,17 +1424,8 @@ def mistral_sdpa_attn_forward_StreamingLLM(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-<<<<<<< HEAD
 
     causal_mask = attention_mask
-=======
-        past_key_value._seen_tokens=self.kv_seq_len
-    
-
-
-
-
->>>>>>> 6b683d4a8387a779540932c6b561596f034fd7ca
     if attention_mask is not None:
         causal_mask = causal_mask[:, :, :, : key_states.shape[-2]]
 
@@ -1823,15 +1789,8 @@ def mistral_sdpa_attn_forward_PyramidKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-<<<<<<< HEAD
 
     causal_mask = attention_mask
-=======
-        past_key_value._seen_tokens=self.kv_seq_len
-    
-
-
->>>>>>> 6b683d4a8387a779540932c6b561596f034fd7ca
     if attention_mask is not None:
         causal_mask = causal_mask[:, :, :, : key_states.shape[-2]]
 
@@ -2067,11 +2026,6 @@ def mistral_attn_forward_SnapKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-<<<<<<< HEAD
-=======
-        past_key_value._seen_tokens=self.kv_seq_len
-    
->>>>>>> 6b683d4a8387a779540932c6b561596f034fd7ca
 
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
@@ -2200,15 +2154,8 @@ def mistral_sdpa_attn_forward_SnapKV(
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-<<<<<<< HEAD
 
     causal_mask = attention_mask
-=======
-        past_key_value._seen_tokens=self.kv_seq_len
-    
-
-
->>>>>>> 6b683d4a8387a779540932c6b561596f034fd7ca
     if attention_mask is not None:
         causal_mask = causal_mask[:, :, :, : key_states.shape[-2]]
 
