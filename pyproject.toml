@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyramidkv"
+version = "0.1.0"
+description = "A unified framework for KV Cache compression of diverse models"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    { name = "Zefan Cai", email = "your email" },
+]
+dependencies = [
+    "transformers>=4.41",
+    "flash-attn>=2.4.0.post1",
+]
+
+[project.optional-dependencies]
+minference = [
+    "git+https://github.com/microsoft/MInference.git@yucheng/kvcompression",
+]
+
+[project.urls]
+Homepage = "https://github.com/Zefan-Cai/PyramidKV" 

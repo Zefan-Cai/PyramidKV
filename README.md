@@ -69,7 +69,12 @@ flash-attn >= 2.4.0.post1
 git clone https://github.com/Zefan-Cai/PyramidKV.git
 cd PyramidKV
 pip install -r requirements.txt .
+```
 
+**Install MInference**
+
+```python
+pip install -e .[minference] --no-build-isolation --no-deps
 ```
 
 ## Inference
