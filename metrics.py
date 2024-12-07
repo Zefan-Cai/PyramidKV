@@ -100,7 +100,7 @@ def classification_score(prediction, ground_truth, **kwargs):
     else:
         score = 0.0
     return score
-    
+
 def rouge_score(prediction, ground_truth, **kwargs):
     rouge = Rouge()
     try:
@@ -111,7 +111,7 @@ def rouge_score(prediction, ground_truth, **kwargs):
 
 def rouge_zh_score(prediction, ground_truth, **kwargs):
     prediction = " ".join(list(jieba.cut(prediction, cut_all=False)))
-    ground_truth = " ".join(list(jieba.cut(ground_truth, cut_all=False))) 
+    ground_truth = " ".join(list(jieba.cut(ground_truth, cut_all=False)))
     score = rouge_score(prediction, ground_truth)
     return score
 

@@ -39,12 +39,12 @@ class KVQuantizedCache(QuantizedCache):
         meta["compute_dtype"] = self.compute_dtype
         self.quantizer.cuda(qtensor, meta=meta, device=self.device)  # Move to device and cast to dtype
         return qtensor, meta, outlier_indices, outlier_values
-        
+
     def _dequantize(self, qtensor, meta, outlier_indices, outlier_values):
 
         tensor = self.quantizer.dequantize(qtensor, meta)
         outlier_indices = torch.stack(outlier_indices, dim=-1)
-        
+
         tensor[outlier_indices.unbind(dim=1)] = outlier_values
         return tensor
 
@@ -94,4 +94,3 @@ class KVQuantizedCache(QuantizedCache):
                 self.key_cache[layer_idx] = torch.cat([self.key_cache[layer_idx], key_states], dim=-2)
                 self.value_cache[layer_idx] = torch.cat([self.value_cache[layer_idx], value_states], dim=-2)
         return keys_to_return, values_to_return
-

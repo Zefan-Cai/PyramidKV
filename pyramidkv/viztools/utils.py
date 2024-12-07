@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 
 def plot_heatmap(
-    data: torch.Tensor, 
-    title: str, 
+    data: torch.Tensor,
+    title: str,
     save_path=None
 ) -> None:
     """

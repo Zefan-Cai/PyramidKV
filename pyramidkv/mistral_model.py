@@ -161,7 +161,7 @@ def mistral_attn_forward_H2O(
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
     if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
@@ -265,7 +265,7 @@ def mistral_sdpa_attn_forward_H2O(
 
     cos, sin = self.rotary_emb(value_states, position_ids)
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
-    
+
     key_states = repeat_kv(key_states, self.num_key_value_groups)
     value_states = repeat_kv(value_states, self.num_key_value_groups)
 
@@ -302,13 +302,13 @@ def mistral_sdpa_attn_forward_H2O(
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
+
             # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
 
 
 
@@ -361,12 +361,12 @@ def mistral_flash_attn2_forward_H2O(
             "`static` cache implementation is not compatible with `attn_implementation==flash_attention_2` "
             "make sure to use `sdpa` in the mean time, and open an issue at https://github.com/huggingface/transformers"
         )
-    
+
     output_attentions = False
 
     # [SnapKV] register kv_cluster
     init_H2O(self)
-    
+
     bsz, q_len, _ = hidden_states.size()
 
     query_states = self.q_proj(hidden_states)
@@ -376,7 +376,7 @@ def mistral_flash_attn2_forward_H2O(
     query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
     key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-    
+
     kv_seq_len = key_states.shape[-2]
     # if past_key_value is not None:
     #     if self.layer_idx is None:
@@ -447,16 +447,16 @@ def mistral_flash_attn2_forward_H2O(
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
+
             # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
         # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
-    
+
     dropout_rate = 0.0 if not self.training else self.attention_dropout
 
     # In PEFT, usually we cast the layer norms in float32 for training stability reasons
@@ -580,7 +580,7 @@ def mistral_attn_forward_L2Norm(
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
     if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
@@ -719,13 +719,13 @@ def mistral_sdpa_attn_forward_L2Norm(
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
+
             # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
 
 
 
@@ -789,7 +789,7 @@ def mistral_flash_attn2_forward_L2Norm(
     query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
     key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-    
+
     kv_seq_len = key_states.shape[-2]
     # if past_key_value is not None:
     #     if self.layer_idx is None:
@@ -869,16 +869,16 @@ def mistral_flash_attn2_forward_L2Norm(
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
+
             # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
         # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
-    
+
     dropout_rate = 0.0 if not self.training else self.attention_dropout
 
     # In PEFT, usually we cast the layer norms in float32 for training stability reasons
@@ -999,7 +999,7 @@ def mistral_attn_forward_CAM(
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
     if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
@@ -1103,7 +1103,7 @@ def mistral_sdpa_attn_forward_CAM(
 
     cos, sin = self.rotary_emb(value_states, position_ids)
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
-    
+
     key_states = repeat_kv(key_states, self.num_key_value_groups)
     value_states = repeat_kv(value_states, self.num_key_value_groups)
 
@@ -1140,13 +1140,13 @@ def mistral_sdpa_attn_forward_CAM(
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
+
             # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
 
 
 
@@ -1199,12 +1199,12 @@ def mistral_flash_attn2_forward_CAM(
             "`static` cache implementation is not compatible with `attn_implementation==flash_attention_2` "
             "make sure to use `sdpa` in the mean time, and open an issue at https://github.com/huggingface/transformers"
         )
-    
+
     output_attentions = False
 
     # [SnapKV] register kv_cluster
     init_CAM(self)
-    
+
     bsz, q_len, _ = hidden_states.size()
 
     query_states = self.q_proj(hidden_states)
@@ -1214,7 +1214,7 @@ def mistral_flash_attn2_forward_CAM(
     query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
     key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-    
+
     kv_seq_len = key_states.shape[-2]
     # if past_key_value is not None:
     #     if self.layer_idx is None:
@@ -1285,16 +1285,16 @@ def mistral_flash_attn2_forward_CAM(
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
+
             # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
         # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
-    
+
     dropout_rate = 0.0 if not self.training else self.attention_dropout
 
     # In PEFT, usually we cast the layer norms in float32 for training stability reasons
@@ -1417,7 +1417,7 @@ def mistral_attn_forward_StreamingLLM(
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
 
 
 
@@ -1524,7 +1524,7 @@ def mistral_sdpa_attn_forward_StreamingLLM(
 
     cos, sin = self.rotary_emb(value_states, position_ids)
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
-    
+
     key_states = repeat_kv(key_states, self.num_key_value_groups)
     value_states = repeat_kv(value_states, self.num_key_value_groups)
 
@@ -1561,13 +1561,13 @@ def mistral_sdpa_attn_forward_StreamingLLM(
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
+
             # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
 
 
 
@@ -1620,12 +1620,12 @@ def mistral_flash_attn2_forward_StreamingLLM(
             "`static` cache implementation is not compatible with `attn_implementation==flash_attention_2` "
             "make sure to use `sdpa` in the mean time, and open an issue at https://github.com/huggingface/transformers"
         )
-    
+
     output_attentions = False
 
     # [SnapKV] register kv_cluster
     init_StreamingLLM(self)
-    
+
     bsz, q_len, _ = hidden_states.size()
 
     query_states = self.q_proj(hidden_states)
@@ -1635,7 +1635,7 @@ def mistral_flash_attn2_forward_StreamingLLM(
     query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
     key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-    
+
     kv_seq_len = key_states.shape[-2]
     # if past_key_value is not None:
     #     if self.layer_idx is None:
@@ -1706,16 +1706,16 @@ def mistral_flash_attn2_forward_StreamingLLM(
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
+
             # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
         # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
-    
+
     dropout_rate = 0.0 if not self.training else self.attention_dropout
 
     # In PEFT, usually we cast the layer norms in float32 for training stability reasons
@@ -1819,9 +1819,9 @@ def mistral_attn_forward_PyramidKV(
                 kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
         else:
             kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
-            
-            
-            
+
+
+
     cos, sin = self.rotary_emb(value_states, position_ids)
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
     # repeat k/v heads if n_kv_heads < n_heads
@@ -1839,7 +1839,7 @@ def mistral_attn_forward_PyramidKV(
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
     if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
@@ -1943,7 +1943,7 @@ def mistral_sdpa_attn_forward_PyramidKV(
 
     cos, sin = self.rotary_emb(value_states, position_ids)
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
-    
+
     key_states = repeat_kv(key_states, self.num_key_value_groups)
     value_states = repeat_kv(value_states, self.num_key_value_groups)
 
@@ -1980,13 +1980,13 @@ def mistral_sdpa_attn_forward_PyramidKV(
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
+
             # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
 
 
 
@@ -2039,12 +2039,12 @@ def mistral_flash_attn2_forward_PyramidKV(
             "`static` cache implementation is not compatible with `attn_implementation==flash_attention_2` "
             "make sure to use `sdpa` in the mean time, and open an issue at https://github.com/huggingface/transformers"
         )
-    
+
     output_attentions = False
 
     # [SnapKV] register kv_cluster
     init_pyramidkv(self, num_hidden_layers=self.config.num_hidden_layers)
-    
+
     bsz, q_len, _ = hidden_states.size()
 
     query_states = self.q_proj(hidden_states)
@@ -2054,7 +2054,7 @@ def mistral_flash_attn2_forward_PyramidKV(
     query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
     key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-    
+
     kv_seq_len = key_states.shape[-2]
     # if past_key_value is not None:
     #     if self.layer_idx is None:
@@ -2125,16 +2125,16 @@ def mistral_flash_attn2_forward_PyramidKV(
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
+
             # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
         # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
-    
+
     dropout_rate = 0.0 if not self.training else self.attention_dropout
 
     # In PEFT, usually we cast the layer norms in float32 for training stability reasons
@@ -2254,7 +2254,7 @@ def mistral_attn_forward_SnapKV(
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
 
     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
@@ -2359,7 +2359,7 @@ def mistral_sdpa_attn_forward_SnapKV(
 
     cos, sin = self.rotary_emb(value_states, position_ids)
     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
-    
+
     key_states = repeat_kv(key_states, self.num_key_value_groups)
     value_states = repeat_kv(value_states, self.num_key_value_groups)
 
@@ -2396,13 +2396,13 @@ def mistral_sdpa_attn_forward_SnapKV(
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
+
             # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
 
 
 
@@ -2455,12 +2455,12 @@ def mistral_flash_attn2_forward_SnapKV(
             "`static` cache implementation is not compatible with `attn_implementation==flash_attention_2` "
             "make sure to use `sdpa` in the mean time, and open an issue at https://github.com/huggingface/transformers"
         )
-    
+
     output_attentions = False
-    
+
     # [SnapKV] register kv_cluster
     init_snapkv(self)
-    
+
     bsz, q_len, _ = hidden_states.size()
 
     query_states = self.q_proj(hidden_states)
@@ -2470,7 +2470,7 @@ def mistral_flash_attn2_forward_SnapKV(
     query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
     key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-    
+
     kv_seq_len = key_states.shape[-2]
     # if past_key_value is not None:
     #     if self.layer_idx is None:
@@ -2541,16 +2541,16 @@ def mistral_flash_attn2_forward_SnapKV(
             self.kv_seq_len = kv_seq_len
             key_states_compress, value_states_compress = self.kv_cluster.update_kv(key_states, query_states, value_states, attention_mask, self.num_key_value_groups)
             past_key_value.update(key_states_compress, value_states_compress, self.layer_idx, cache_kwargs)
-            
+
             # print(f"debug key_states.shape[-2] {key_states_compress.shape[-2]} value_states_compress.shape {value_states_compress.shape[-2]}")
         else:
             self.kv_seq_len += q_len
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
         past_key_value._seen_tokens=self.kv_seq_len
-    
+
         # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
-    
+
     dropout_rate = 0.0 if not self.training else self.attention_dropout
 
     # In PEFT, usually we cast the layer norms in float32 for training stability reasons
@@ -2612,7 +2612,7 @@ def mistral_flash_attn2_forward_HeadKV(
     output_attentions: bool = False,
     use_cache: bool = False,
     **kwargs,
-):  
+):
     init_adakv(self)
     if "padding_mask" in kwargs:
         warnings.warn(
@@ -2630,7 +2630,7 @@ def mistral_flash_attn2_forward_HeadKV(
     query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
     key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-    
+
     kv_seq_len = key_states.shape[-2]
     # if past_key_value is not None:
     #     if self.layer_idx is None:
@@ -2785,7 +2785,7 @@ def mistral_flash_attn2_forward_HeadKV(
     output_attentions: bool = False,
     use_cache: bool = False,
     **kwargs,
-):  
+):
     init_headkv(self)
     if "padding_mask" in kwargs:
         warnings.warn(
@@ -2803,7 +2803,7 @@ def mistral_flash_attn2_forward_HeadKV(
     query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
     key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-    
+
     kv_seq_len = key_states.shape[-2]
     # if past_key_value is not None:
     #     if self.layer_idx is None:
@@ -3154,9 +3154,9 @@ def prepare_inputs_for_generation_mistral(
         # input_ids based on the past_length.
         elif past_length < input_ids.shape[1]:
             input_ids = input_ids[:, past_length:]
-            
+
             # TODO
-            
+
         # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
 
         # If we are about to go beyond the maximum cache length, we need to crop the input attention mask.
@@ -3192,4 +3192,3 @@ def prepare_inputs_for_generation_mistral(
         }
     )
     return model_inputs
-

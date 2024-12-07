@@ -136,7 +136,7 @@ def llama_attn_forward_SnapKV_ThinK(
                 "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
                 "with a layer index."
             )
-        if hasattr(self, "kv_seq_len"): 
+        if hasattr(self, "kv_seq_len"):
             if self.kv_seq_len != 0:
                 kv_seq_len += self.kv_seq_len
             else:
@@ -349,8 +349,8 @@ def prepare_inputs_for_generation_llama_new(
 def prepare_inputs_for_generation_llama(
     self, input_ids, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
 ):
-    
-    
+
+
     if past_key_values is None or len(past_key_values.key_cache) == 0:
         for layer in self.model.layers:
             layer.self_attn.kv_seq_len = 0
@@ -374,8 +374,8 @@ def prepare_inputs_for_generation_llama(
         # input_ids based on the past_length.
         elif past_length < input_ids.shape[1]:
             input_ids = input_ids[:, past_length:]
-            
-            
+
+
         # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
 
         # If we are about to go beyond the maximum cache length, we need to crop the input attention mask.
@@ -392,9 +392,9 @@ def prepare_inputs_for_generation_llama(
         position_ids = attention_mask.long().cumsum(-1) - 1
         position_ids.masked_fill_(attention_mask == 0, 1)
         if past_key_values:
-            
-            
-            
+
+
+
             position_ids = position_ids[:, -input_ids.shape[1] :]
 
     # if `inputs_embeds` are passed, we only want to use them in the 1st generation step

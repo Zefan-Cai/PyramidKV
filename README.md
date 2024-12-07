@@ -41,7 +41,7 @@
 </p>
 
 
-## Visualization: Inefficient Attention 
+## Visualization: Inefficient Attention
 
 The Llama model attention map with 3 documents is represented as follows:
 
@@ -115,7 +115,7 @@ python3 run_longbench.py \
 
 After modifying parameters, run:
 
-```bash 
+```bash
 
 sh scripts/scripts_longBench/eval.sh
 
@@ -169,7 +169,7 @@ bash scripts/scripts_needle/eval.sh
 
 After inference, run
 
-`python scripts/scripts_needle/visualize.py` 
+`python scripts/scripts_needle/visualize.py`
 
 to draw the img, you should change `FOLDER_PATH` in `visualize.py` to your output path (the argument of `--model_version` in `eval.sh`).
 
