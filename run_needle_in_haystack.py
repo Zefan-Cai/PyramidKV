@@ -1,10 +1,10 @@
 """
-This script is adapted from 
+This script is adapted from
 https://github.com/FranxYao/Long-Context-Data-Engineering
 """
 
 import tiktoken
-import os 
+import os
 import pdb
 import glob
 import jieba
@@ -35,8 +35,8 @@ class LLMNeedleHaystackTester:
     """
     def __init__(self,
                  needle="\nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\n",#    \n在旧金山做的最棒的是事是吃一个三明治以及在晴天坐在多洛雷斯公园里\n
-                 haystack_dir="data/PaulGrahamEssays", # PaulGrahamEssays  
-                 retrieval_question="The best thing to do in San Francisco is: ", 
+                 haystack_dir="data/PaulGrahamEssays", # PaulGrahamEssays
+                 retrieval_question="The best thing to do in San Francisco is: ",
                  results_version = 1,
                  context_lengths_min = None,
                  context_lengths_max = None,
@@ -52,18 +52,18 @@ class LLMNeedleHaystackTester:
                  anthropic_api_key = None,
                  model_name='',
                  model_name_suffix=None,
-                 model_version=None, 
+                 model_version=None,
                  num_concurrent_requests = 1,
                  save_results = True,
                  save_contexts = True,
                  final_context_length_buffer = 200,
                  seconds_to_sleep_between_completions = None,
-                 print_ongoing_status = True, 
-                 step=100, 
-                 method='pyramidkv', 
+                 print_ongoing_status = True,
+                 step=100,
+                 method='pyramidkv',
                  attn_implementation='flash_attention_2',
                  max_capacity_prompt=128):
-        """        
+        """
         :param needle: The needle to be found in the haystack. Default is None.
         :param haystack_dir: The directory of text files to use as background context (or a haystack) in which the needle is to be found. Default is Paul Graham Essays.
         :param retrieval_question: The question which with to prompt the model to do the retrieval.
@@ -90,7 +90,7 @@ class LLMNeedleHaystackTester:
         """
         if not needle or not haystack_dir or not retrieval_question:
             raise ValueError("Needle, haystack, and retrieval_question must be provided.")
-        
+
         self.needle = needle
         self.haystack_dir = haystack_dir
         self.retrieval_question = retrieval_question
@@ -135,7 +135,7 @@ class LLMNeedleHaystackTester:
 
         if document_depth_percent_interval_type not in [None, "linear", "sigmoid"]:
             raise ValueError("document_depth_percent_interval_type must be either None, 'linear' or 'sigmoid'. If you'd like your own distribution give a list of ints in via document_depth_percent_intervals")
-        
+
         self.model_name = model_name
 
         if(self.model_provider in ["LLaMA3", "Mistral"]):
@@ -147,49 +147,49 @@ class LLMNeedleHaystackTester:
             # if torch.cuda.device_count()>1:
 
             from accelerate import init_empty_weights, load_checkpoint_and_dispatch
-            from transformers import AutoConfig 
+            from transformers import AutoConfig
 
 
             if self.method == 'full':
                 self.model_to_test=AutoModelForCausalLM.from_pretrained(
-                    model_name, 
+                    model_name,
                     torch_dtype=torch.float16,
                     attn_implementation=self.attn_implementation,
                     device_map="auto",
-                    low_cpu_mem_usage=True, 
+                    low_cpu_mem_usage=True,
                     # use_cache=False
                     ).eval()
 
 
             if self.method in ["pyramidkv", "snapkv","streamingllm","h2o","cam"]:
-            
+
                 if self.model_provider == 'LLaMA3':
                     replace_llama(self.method.lower())
                 elif self.model_provider == 'Mistral':
                     replace_mistral(self.method.lower())
-                     
+
                 if self.max_capacity_prompts != -1:
                     max_capacity_prompts = self.max_capacity_prompts
-            
+
                 self.model_to_test=AutoModelForCausalLM.from_pretrained(
-                    model_name, 
+                    model_name,
                     torch_dtype=torch.float16,
                     attn_implementation=self.attn_implementation,
                     device_map="auto",
-                    low_cpu_mem_usage=True, 
+                    low_cpu_mem_usage=True,
                     # use_cache=False
                     ).eval()
 
-                
+
                 if self.method.lower() == "pyramidkv":
                     window_sizes = 8
                 elif self.method.lower() in ["snapkv","streamingllm","h2o","cam"]:
                     window_sizes = 32
-                    
+
                 kernel_sizes = 7
                 pooling = "maxpool"
 
-                
+
                 layers = len(self.model_to_test.model.layers)
                 # check if window_sizes is a list
                 if not isinstance(window_sizes, list):
@@ -203,12 +203,12 @@ class LLMNeedleHaystackTester:
                     self.model_to_test.model.layers[i].self_attn.config.max_capacity_prompt = max_capacity_prompts[i]
                     self.model_to_test.model.layers[i].self_attn.config.kernel_size = kernel_sizes[i]
                     self.model_to_test.model.layers[i].self_attn.config.pooling = pooling
-                    
-                
+
+
                 # self.model_to_test = tp.tensor_parallel(self.model_to_test, sharded=True)
 
         else:raise ValueError("model_provider must be either 'LLaMA3' or 'Mistral'")
-            
+
 
     def logistic(self, x, L=100, x0=50, k=.1):
         if x == 0:
@@ -216,7 +216,7 @@ class LLMNeedleHaystackTester:
         if x == 100:
             return 100
         return np.round(L / (1 + np.exp(-k * (x - x0))), 3)
-    
+
     def bound_evaluate_and_log(self, *args):
         self.evaluate_and_log(*args)
 
@@ -235,7 +235,7 @@ class LLMNeedleHaystackTester:
         if(self.model_provider not in ["OpenAI", "Anthropic"]):
             test_format=f"<|im_start|> This is a very long story book: <book> {context} </book>.\n Based on the content of the book, Question: {self.retrieval_question}\nAnswer:"
             return test_format
-        else: 
+        else:
             return [
                 {
                     "role": "system",
@@ -253,7 +253,7 @@ class LLMNeedleHaystackTester:
                     "role": "assistant",
                     "content":"",
                 },
-                
+
             ]
 
     def evaluate_and_log(self, context_length, depth_percent):
@@ -272,14 +272,14 @@ class LLMNeedleHaystackTester:
         # Prepare your message to send to the model you're going to evaluate
         prompt = self.generate_prompt(context)
         test_start_time = time.time()
-        
+
         if(self.model_provider in ["LLaMA3", "Mistral"]):
 
             prompt = self.enc(prompt, return_tensors="pt")
             input_ids = prompt['input_ids'].to(self.model_to_test.device)
-            
+
             output_ids = self.model_to_test.generate(
-                input_ids, 
+                input_ids,
                 output_attentions=False,
                 max_new_tokens=30,
                 num_beams=1,
@@ -289,7 +289,7 @@ class LLMNeedleHaystackTester:
             )
             response = self.enc.decode(output_ids[0][input_ids.shape[1]:], skip_special_tokens=True).strip()
 
-        
+
         print(response)
         test_end_time = time.time()
         test_elapsed_time = test_end_time - test_start_time
@@ -307,7 +307,7 @@ class LLMNeedleHaystackTester:
             'model_response' : response,
             'score' : score,
             'test_duration_seconds' : test_elapsed_time,
-            'test_timestamp_utc' : datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S%z'), 
+            'test_timestamp_utc' : datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S%z'),
         }
 
         self.testing_results.append(results)
@@ -334,12 +334,12 @@ class LLMNeedleHaystackTester:
 
             with open(f'results_needle/contexts/{self.model_version}/{context_file_location}_context.txt', 'w') as f:
                 f.write(context)
-            
+
         if self.save_results:
             # Save the context to file for retesting
             if not os.path.exists('results_needle/results'):
                 os.makedirs('results_needle/results')
-            
+
             if not os.path.exists(f'results_needle/results/{self.model_version}'):
                 os.makedirs(f'results_needle/results/{self.model_version}')
 
@@ -384,7 +384,7 @@ class LLMNeedleHaystackTester:
         context = self.insert_needle(context, depth_percent, context_length)
 
         return context
-    
+
     def encode_text_to_tokens(self, text):
         if self.model_provider in ["Mistral", "LLaMA3"]:
             return self.enc.encode(text, add_special_tokens=False)
@@ -394,7 +394,7 @@ class LLMNeedleHaystackTester:
         else:
             return self.enc.encode(text)
             raise ValueError("model_provider must be either 'OpenAI' or 'Anthropic'")
-    
+
     def insert_needle(self, context, depth_percent, context_length):
         tokens_needle = self.encode_text_to_tokens(self.needle)
         tokens_context = self.encode_text_to_tokens(context)
@@ -422,7 +422,7 @@ class LLMNeedleHaystackTester:
             elif(self.model_provider == "Mistral"): period_tokens = [842, 28723]
             elif(self.model_provider == "GLM"): period_tokens = [918, 30930]
             else: period_tokens = self.encode_text_to_tokens('.')
-            
+
             # Then we iteration backwards until we find the first period
             while tokens_new_context and tokens_new_context[-1] not in period_tokens:
                 insertion_point -= 1
@@ -460,7 +460,7 @@ class LLMNeedleHaystackTester:
         else:
             return self.enc.encode(context)
             # raise ValueError("model_provider must be either 'OpenAI' or 'Anthropic'")
-        
+
     def decode_tokens(self, tokens, context_length=None):
         if self.model_provider in ["Mistral", "LLaMA3"]:
             return self.enc.decode(tokens[:context_length], skip_special_tokens=True)
@@ -473,10 +473,10 @@ class LLMNeedleHaystackTester:
         if len(tokens) > context_length:
             context = self.decode_tokens(tokens, context_length)
         return context
-    
+
     def get_results(self):
         return self.testing_results
-    
+
     def print_start_test_summary(self):
         print ("\n")
         print ("Starting Needle In A Haystack Testing...")
@@ -509,19 +509,19 @@ if __name__ == "__main__":
     parser.add_argument('--max_capacity_prompt', type=int, default=128)
     args = parser.parse_args()
 
-    
 
-    ht = LLMNeedleHaystackTester(model_name=args.model_name, 
+
+    ht = LLMNeedleHaystackTester(model_name=args.model_name,
                                  model_name_suffix=args.model_name_suffix,
                                  model_provider=args.model_provider,
-                                 model_version=args.model_version, 
+                                 model_version=args.model_version,
                                  context_lengths_min=args.s_len,
                                  save_contexts=True,
                                  save_results=True,
-                                 openai_api_key=args.api_key, 
-                                 context_lengths_max=args.e_len, 
-                                 step=args.step, 
-                                 method=args.method, 
+                                 openai_api_key=args.api_key,
+                                 context_lengths_max=args.e_len,
+                                 step=args.step,
+                                 method=args.method,
                                  max_capacity_prompt=args.max_capacity_prompt,
                                  attn_implementation=args.attn_implementation
                                  )

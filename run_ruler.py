@@ -55,56 +55,56 @@ def build_chat(prompt):
         return prompt
 
 # def build_prompt(prompt, dataset):
-    
+
 #     SYSTEM_PROMPT = model2prompt[dataset]
 
 #     prompt = f"<<SYS>>\n {SYSTEM_PROMPT} \n<</SYS>>\n\n{prompt}"
 #     return prompt
 
 def main(args):
-    
+
 
     print("Loading data...")
-    
+
     test_data = []
     prompt_list = []
     input_list = []
     outputs_list: List[List[str]] = [] # List of List
     length_list = []
     index_list = []
-    
+
     input_max_len = 0
     model_path = args.model_path.lower()
-    
+
     for key in model2maxlen:
         if key in model_path:
             model_max_len = model2maxlen[key]
-    
+
     output_max_len = dataset2maxlen[args.dataset]
-    
+
     with open(args.data_file) as fp:
         for line in fp:
 
             example = json.loads(line)
             length = example["length"]
-            if length > input_max_len: 
+            if length > input_max_len:
                 input_max_len = length
 
             prompt = example["input"] #TODO tokenizer.apply_chat_template ?
             if "llama2" in args.model_path.lower():
                 prompt = build_chat(prompt)
             example["prompt"] = prompt
-                
+
             test_data.append(example)
-        
+
     print(f"Max Length is {input_max_len}")
-        
+
     if args.max_num_examples and len(test_data) > args.max_num_examples:
         if args.sample_method == "random":
             test_data = random.sample(test_data, args.max_num_examples)
         elif args.sample_method == "topk":
             test_data = test_data[:args.max_num_examples]
-    
+
     for example in test_data:
         prompt_list.append(example["prompt"])
         input_list.append(example["input"])
@@ -117,14 +117,14 @@ def main(args):
 
     os.makedirs(os.path.join(args.save_dir, f"{model_name}_{args.max_capacity_prompts}", str(args.context_length), args.dataset), exist_ok=True)
     fout = open(os.path.join(args.save_dir, f"{model_name}_{args.max_capacity_prompts}", str(args.context_length), args.dataset, f"{args.method}.json"), "w")
-    
+
     for i in tqdm(range(0, len(prompt_list), args.eval_batch_size)):
-        
+
         batch_prompts = prompt_list[i:i+args.eval_batch_size]
         batch_inputs = input_list[i:i+args.eval_batch_size]
         batch_answers = outputs_list[i:i+args.eval_batch_size]
         batch_lengths = length_list[i:i+args.eval_batch_size]
-        
+
         tokenized_prompts = tokenizer(batch_prompts, padding="longest", return_tensors="pt", add_special_tokens=True).to('cuda')
         batch_input_ids = tokenized_prompts.input_ids
         attention_mask = tokenized_prompts.attention_mask
@@ -132,7 +132,7 @@ def main(args):
         if len(batch_input_ids[0]) > model_max_len:
             half = int(model_max_len/2)
             prompt = tokenizer.decode(batch_input_ids[0][:half], skip_special_tokens=True)+tokenizer.decode(batch_input_ids[0][-half:], skip_special_tokens=True)
-            
+
             tokenized_prompts = tokenizer(prompt, padding="longest", return_tensors="pt", add_special_tokens=True).to('cuda')
             batch_input_ids = tokenized_prompts.input_ids
             attention_mask = tokenized_prompts.attention_mask
@@ -141,8 +141,8 @@ def main(args):
             max_capacity_prompts = args.max_capacity_prompts
         elif args.max_capacity_prompts_ratio != -1:
             max_capacity_prompts = round(batch_input_ids.shape[1] * args.max_capacity_prompts_ratio)
-        
-        
+
+
         if args.method != "FullKV":
             if args.method.lower() in ["snapkv","pyramidkv","h2o","cam", "l2norm"]:
                 window_sizes = 8
@@ -167,7 +167,7 @@ def main(args):
                 model.model.layers[i].self_attn.config.pooling = pooling
 
         context_length = batch_input_ids.shape[-1]
-        if args.quant_method == None:        
+        if args.quant_method == None:
             output = model.generate(
                 **tokenized_prompts,
                 output_attentions = args.output_attentions,
@@ -188,7 +188,7 @@ def main(args):
                 temperature=1.0,
                 min_length=context_length+1,
                 eos_token_id=[tokenizer.eos_token_id],
-                cache_implementation="quantized", 
+                cache_implementation="quantized",
                 cache_config={"nbits": args.nbits, "backend": "HQQ","device":"cuda","residual_length":output_max_len,"axis_key":1,"q_group_size":64},
             )
 
@@ -196,9 +196,9 @@ def main(args):
         batch_generations = batch_outputs
 
         torch.cuda.empty_cache()
-        
+
         for j in range(args.eval_batch_size):
-            
+
             example = {}
             example["prompt"] = batch_prompts[j]
             example["input"] = batch_inputs[j]
@@ -207,13 +207,13 @@ def main(args):
             example["length"] = batch_lengths[j]
 
             fout.write(json.dumps(example) + "\n")
-    
-    
+
+
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    
+
     parser.add_argument("--seed", type=int, default=42, help="")
     parser.add_argument("--base_dir", type=str, default="")
     parser.add_argument("--dataset", type=str, default="")
@@ -224,14 +224,14 @@ if __name__ == "__main__":
     parser.add_argument("--model_path", type=str, default=None, help="if specified, we will load the model to generate the predictions.")
     parser.add_argument("--use_fast_tokenizer", type=bool, default=True, help="")
     parser.add_argument("--output_attentions", type=bool, default=False, help="")
-    
+
     parser.add_argument("--max_num_examples", type=int, default=None, help="maximum number of examples to evaluate per task.")
     parser.add_argument("--sample_method", type=str, default="topk", choices=["random", "topk"], help="how to sample the examples.")
-    
+
     parser.add_argument("--max_new_tokens", type=int, default=None, help="")
-    
+
     parser.add_argument("--eval_batch_size", type=int, default=1, help="batch size for evaluation.")
-    
+
     parser.add_argument("--use_cache", type=bool, default=True, help="")
     parser.add_argument("--attn_implementation", type=str,  default="flash_attention_2", choices=["flash_attention_2", "sdpa", "eager"])
     parser.add_argument("--method", type=str,  default=None)
@@ -240,21 +240,21 @@ if __name__ == "__main__":
     parser.add_argument("--max_capacity_prompts", type=int, default=512, help="")
     parser.add_argument("--max_capacity_prompts_ratio", type=float, default=-1, help="")
     parser.add_argument("--steps", type=int, default=-1, help="maximum number of examples to evaluate per task.")
-    
+
     parser.add_argument(
-        "--use_chat_format", 
-        action="store_true", 
+        "--use_chat_format",
+        action="store_true",
         help="If given, we will use the chat format for the prompts."
     )
     parser.add_argument(
-        "--chat_formatting_function", 
-        type=str, 
-        default="eval.templates.create_prompt_with_tulu_chat_format", 
+        "--chat_formatting_function",
+        type=str,
+        default="eval.templates.create_prompt_with_tulu_chat_format",
         help="The function to use to create the chat format. This function will be dynamically imported. Please see examples in `eval/templates.py`."
     )
-    
+
     args = parser.parse_args()
-    
+
     set_seed(args.seed)
     if args.quant_method == "kvquant":
         from pyramidkv.quantcache import KVQuantizedCache
@@ -270,7 +270,7 @@ if __name__ == "__main__":
     from pyramidkv.monkeypatch import replace_llama,replace_mistral
     replace_llama(args.method.lower())
     replace_mistral(args.method.lower())
-    
+
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path,
         torch_dtype=torch.float16,
@@ -279,17 +279,17 @@ if __name__ == "__main__":
         use_cache=args.use_cache,
         attn_implementation=args.attn_implementation
     )
-    
+
     tokenizer.padding_side = "left"
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
-    
+
     model.eval()
-    
+
     save_dir = args.save_dir
     max_capacity_prompts = args.max_capacity_prompts
-    
+
     for context_length in context_length_list:
         for idx, dataset in enumerate(datasets):
 

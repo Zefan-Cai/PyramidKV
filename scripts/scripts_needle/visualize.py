@@ -1,4 +1,3 @@
-
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -32,7 +31,7 @@ def main():
         with open(file, 'r') as f:
             json_data = json.load(f)
             # Extracting the required fields
-            
+
             try:
                 document_depth = json_data.get("depth_percent", None)
                 context_length = json_data.get("context_length", None)

@@ -18,4 +18,3 @@ python3 run_longbench.py \
     --save_dir ${save_dir} \
     --use_cache True
 done
-

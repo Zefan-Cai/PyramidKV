@@ -14,7 +14,7 @@ def plot_attention_heatmap(attentions, head_ids=None, layer_ids=None, save_dir="
         head_ids (list[int], optional): List of head indices to visualize. If None, all heads are averaged.
     """
     assert layer_ids is not None, "Please provide the layer_ids to visualize."
-    
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     for layer_id in layer_ids:
