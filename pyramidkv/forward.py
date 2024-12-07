@@ -1,5 +1,14 @@
 from transformers.modeling_flash_attention_utils import _flash_attention_forward
 from transformers.models.llama.modeling_llama import *
+from transformers.utils.import_utils import _is_package_available
+
+# collection of customized forward functions
+prefill_forwards = {}
+decoding_forwards = {}
+
+if _is_package_available("minference"):
+    from minference.modules.minference_forward import minference_prefill_forward
+    prefill_forwards["minference"] = minference_prefill_forward
 
 def hybrid_attn_forward(
     self,
