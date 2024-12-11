@@ -14,10 +14,10 @@ def parse_args(args=None):
 
 if __name__ == '__main__':
     args = parse_args()
-    
+
     dataset_list = ["niah_single_1", "niah_single_2", "niah_single_3", "niah_multikey_1", "niah_multikey_2", "niah_multikey_3",
             "niah_multiquery", "niah_multivalue", "cwe", "fwe", "vt"]
-    
+
     results_list = [
         ["dataset"],
         ["FullKV"],
@@ -28,17 +28,17 @@ if __name__ == '__main__':
         ["PyramidKV"],
         ["L2Norm"]
     ]
-    
+
     for dataset in dataset_list:
-        
+
         results_list[0].append(dataset)
-        
+
         for idx, method in enumerate(["FullKV", "random", "SnapKV", "StreamingLLM", "H2O", "PyramidKV", "L2Norm"]):
             try:
                 args.method = method
                 args.dataset = dataset
                 args.eval_file = os.path.join(args.results_dir,dataset,f"{method}.json")
-                
+
                 scores = dict()
                 predictions, answers, lengths = [], [], []
                 # dataset = filename.split('.')[0]
@@ -52,11 +52,11 @@ if __name__ == '__main__':
                                 lengths.append(data["length"])
                         except:
                             print("error")
-                
+
                 score = string_match_all(predictions, answers)
                 scores[args.dataset] = score
                 results_list[idx+1].append(score)
-                
+
                 output_dir = os.path.dirname(args.eval_file)
                 with open(os.path.join(output_dir, "metrics.json"), "w") as f:
                     json.dump(scores, f, ensure_ascii=False, indent=4)
@@ -65,7 +65,7 @@ if __name__ == '__main__':
             except:
                 results_list[idx+1].append(-1)
                 print(f"dataset {args.dataset} method {args.method} scores {None}")
-                
+
     import csv
     with open(os.path.join(args.results_dir,f"results.csv"), 'w') as fp:
         writer = csv.writer(fp)

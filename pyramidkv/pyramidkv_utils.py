@@ -20,7 +20,7 @@ def key_pruner_query_driven(kv_states, q_states, recent_size=128, ratio=0.3):
     _, indices = torch.topk(key, k, dim=-1, largest=False)
     keep_idx = indices.sort().values
     mask = torch.zeros(key.shape, dtype=torch.bool).to(kv_states.device)
-    mask = mask.scatter_(-1, keep_idx, 1)                   
+    mask = mask.scatter_(-1, keep_idx, 1)
     mask_k = mask.unsqueeze(2).expand(-1, -1, seqlen - recent_size, -1)
 
     return kv_states[:, :, :seqlen - recent_size, :][~mask_k].reshape(1,-1,seqlen - recent_size,head_dim-k), kv_states[:, :, seqlen - recent_size:, :], ~mask
@@ -117,7 +117,7 @@ def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
 
 def merge_kv(key_states, value_states, indices, window_size, merge):
-    # merge methods in LOOK-M 
+    # merge methods in LOOK-M
 
     bsz, num_heads, k_len, head_dim = key_states.shape
 
@@ -130,7 +130,7 @@ def merge_kv(key_states, value_states, indices, window_size, merge):
     all_indices_flattened = all_indices.flatten()  # [bsz * num_heads * (k_len-window_size)]
     selected_indices_flattened = indices.flatten()  # [bsz * num_heads * topk_len]
     is_selected = torch.isin(all_indices_flattened, selected_indices_flattened)
-    drop_indices_flattened = all_indices_flattened[~is_selected] 
+    drop_indices_flattened = all_indices_flattened[~is_selected]
     drop_len = drop_indices_flattened.shape[0] // (all_indices.shape[0] * all_indices.shape[1])
     drop_indices = drop_indices_flattened.reshape(all_indices.shape[0], all_indices.shape[1], drop_len) # [bsz * num_heads * (k_len-window_size-topk_len)]
     drop_indices = drop_indices.unsqueeze(-1).expand(-1, -1, -1, head_dim)  # [bsz, num_heads, (k_len-window_size-topk_len), head_dim]
@@ -162,7 +162,7 @@ def merge_kv(key_states, value_states, indices, window_size, merge):
         v_hh_recent = torch.scatter_reduce(input=v_hh_recent, dim=2, index=merged_indices, src=v_hh_merged, reduce='mean', include_self=True)
     else:
         raise ValueError('Merge method not supported')
-        
+
     # TODO: other merge strategies
     # average merge
     # weight merge
@@ -172,13 +172,13 @@ def merge_kv(key_states, value_states, indices, window_size, merge):
 
 class PyramidKVCluster():
     def __init__(self, num_hidden_layers = 32, window_size = 64, max_capacity_prompt = 256 + 64, kernel_size = 5, pooling = 'avgpool', beta = 20, num_layers = 80, layer_idx=None, merge = None):
-        
+
         self.layer_idx = layer_idx
         self.num_hidden_layers = num_hidden_layers
-        
+
         self.steps = -1
         self.beta = beta
-        
+
         self.window_size = window_size
         self.max_capacity_prompt = max_capacity_prompt
         assert self.max_capacity_prompt - self.window_size > 0
@@ -195,25 +195,25 @@ class PyramidKVCluster():
         self.merge = merge
 
     def update_kv(self, key_states, query_states, value_states, attention_mask, num_key_value_groups):
-        
+
         # check if prefix phase
         assert key_states.shape[-2] == query_states.shape[-2]
         bsz, num_heads, q_len, head_dim = query_states.shape
-        
+
         # TODO
         # window_sizes = 32
         min_num = (self.max_capacity_prompt - self.window_size) // self.beta
         max_num = (self.max_capacity_prompt - self.window_size) * 2 - min_num
-        
-            
+
+
         if max_num >= q_len - self.window_size:
             max_num = q_len - self.window_size
             min_num = (self.max_capacity_prompt - self.window_size) * 2 - max_num
-    
-       
+
+
         steps = (max_num - min_num) // (self.num_hidden_layers - 1)
         max_capacity_prompt = max_num - self.layer_idx * steps
-        
+
         print(f"PyramidKV max_capacity_prompt {max_capacity_prompt}")
         if q_len < self.max_capacity_prompt:
             return key_states, value_states
@@ -237,7 +237,7 @@ class PyramidKVCluster():
                 raise ValueError('Pooling method not supported')
             indices = attn_cache.topk(self.max_capacity_prompt - self.window_size, dim=-1).indices
             indices = indices.unsqueeze(-1).expand(-1, -1, -1, head_dim)
-            
+
             if self.merge is not None:
                 key_states, value_states = merge_kv(key_states, value_states, indices, self.window_size, self.merge)
                 return key_states, value_states
@@ -304,13 +304,13 @@ class SnapKVCluster():
         self.recent_size = recent_size
 
     def update_kv(self, key_states, query_states, value_states, attention_mask, num_key_value_groups):
-        
+
         # check if prefix phase
         assert key_states.shape[-2] == query_states.shape[-2]
         bsz, num_heads, q_len, head_dim = query_states.shape
-        
+
         print(f"SnapKV max_capacity_prompt {self.max_capacity_prompt}")
-        
+
         if q_len < self.max_capacity_prompt:
             return key_states, value_states
         else:
@@ -347,13 +347,13 @@ class SnapKVCluster():
             return key_states, value_states
 
     def update_think(self, key_states, query_states, value_states, attention_mask, num_key_value_groups):
-        
+
         # check if prefix phase
         assert key_states.shape[-2] == query_states.shape[-2]
         bsz, num_heads, q_len, head_dim = query_states.shape
-        
+
         print(f"SnapKV max_capacity_prompt {self.max_capacity_prompt}")
-        
+
         if q_len < self.max_capacity_prompt:
             return key_states, value_states
         else:
@@ -401,15 +401,15 @@ class L2NormCluster():
         self.max_capacity_prompt = max_capacity_prompt
         self.layer_idx = layer_idx
         self.skip_layers = skip_layers
-        
+
     def update_kv(self, key_states, query_states, value_states, attention_mask, num_key_value_groups):
-        
+
         # check if prefix phase
         assert key_states.shape[-2] == query_states.shape[-2]
         bsz, num_heads, q_len, head_dim = query_states.shape
-        
+
         print(f"L2Norm max_capacity_prompt {self.max_capacity_prompt}")
-        
+
         if q_len < self.max_capacity_prompt:
             return key_states, value_states
         elif self.layer_idx in self.skip_layers:
@@ -422,7 +422,7 @@ class L2NormCluster():
 
             sorted_key_states = key_states.gather(dim=2, index=sorted_indices_expanded)
             sorted_value_states = value_states.gather(dim=2, index=sorted_indices_expanded)
-            
+
             key_states = sorted_key_states[:, :, :self.max_capacity_prompt, :]
             value_states = sorted_value_states[:, :, :self.max_capacity_prompt, :]
 
@@ -448,13 +448,13 @@ class CAMKVCluster:
         self.merge = merge
 
     def update_kv(self, key_states, query_states, value_states, attention_mask, num_key_value_groups):
-        
+
         # check if prefix phase
         assert key_states.shape[-2] == query_states.shape[-2]
         bsz, num_heads, q_len, head_dim = query_states.shape
-        
+
         print(f"CAM max_capacity_prompt {self.max_capacity_prompt}")
-        
+
         if q_len < self.max_capacity_prompt:
             return key_states, value_states
         else:
@@ -531,13 +531,13 @@ class H2OKVCluster():
         self.merge = merge
 
     def update_kv(self, key_states, query_states, value_states, attention_mask, num_key_value_groups):
-        
+
         # check if prefix phase
         assert key_states.shape[-2] == query_states.shape[-2]
         bsz, num_heads, q_len, head_dim = query_states.shape
-        
+
         print(f"H2O max_capacity_prompt {self.max_capacity_prompt}")
-        
+
         if q_len < self.max_capacity_prompt:
             return key_states, value_states
         else:
@@ -593,17 +593,17 @@ class StreamingLLMKVCluster():
         self.merge = merge
 
     def update_kv(self, key_states, query_states, value_states, attention_mask, num_key_value_groups):
-        
+
         # check if prefix phase
         assert key_states.shape[-2] == query_states.shape[-2]
         bsz, num_heads, q_len, head_dim = query_states.shape
-        
+
         print(f"StreamingLLM max_capacity_prompt {self.max_capacity_prompt}")
-        
+
         if q_len < self.max_capacity_prompt:
             return key_states, value_states
         else:
-            
+
             indices = torch.tensor(range(self.max_capacity_prompt - self.window_size), dtype=torch.int64).to(key_states.device)
             indices = indices.unsqueeze(0).unsqueeze(0).unsqueeze(-1).repeat(bsz, num_heads, 1, head_dim)
 
@@ -889,18 +889,18 @@ def init_pyramidkv(self, num_hidden_layers):
             self.config.pooling = 'avgpool'
         if not hasattr(self.config, 'merge'):
             self.config.merge = None
-    
-    
-    self.kv_cluster = PyramidKVCluster( 
+
+
+    self.kv_cluster = PyramidKVCluster(
         num_hidden_layers = num_hidden_layers,
         layer_idx = self.layer_idx,
-        window_size = self.config.window_size, 
-        max_capacity_prompt = self.config.max_capacity_prompt, 
+        window_size = self.config.window_size,
+        max_capacity_prompt = self.config.max_capacity_prompt,
         kernel_size = self.config.kernel_size,
         pooling = self.config.pooling,
         merge = self.config.merge,
         )
- 
+
 def init_snapkv(self):
     if not hasattr(self, "kv_cluster"):
         if not hasattr(self.config, 'window_size'):
@@ -913,11 +913,11 @@ def init_snapkv(self):
             self.config.pooling = 'avgpool'
         if not hasattr(self.config, 'merge'):
             self.config.merge = None
-    
-    
-    self.kv_cluster = SnapKVCluster( 
-        window_size = self.config.window_size, 
-        max_capacity_prompt = self.config.max_capacity_prompt, 
+
+
+    self.kv_cluster = SnapKVCluster(
+        window_size = self.config.window_size,
+        max_capacity_prompt = self.config.max_capacity_prompt,
         kernel_size = self.config.kernel_size,
         pooling = self.config.pooling,
         merge = self.config.merge,
@@ -939,11 +939,11 @@ def init_think(self):
             self.config.recent_size = 32
         if not hasattr(self.config, 'ratio'):
             self.config.ratio = 0.4
-    
-    
-    self.kv_cluster = SnapKVCluster( 
-        window_size = self.config.window_size, 
-        max_capacity_prompt = self.config.max_capacity_prompt, 
+
+
+    self.kv_cluster = SnapKVCluster(
+        window_size = self.config.window_size,
+        max_capacity_prompt = self.config.max_capacity_prompt,
         kernel_size = self.config.kernel_size,
         pooling = self.config.pooling,
         merge = self.config.merge,
@@ -952,7 +952,7 @@ def init_think(self):
         )
 
 def init_l2norm(self):
-    
+
     if not hasattr(self, "kv_cluster"):
         if not hasattr(self.config, 'max_capacity_prompt'):
             self.config.max_capacity_prompt = 4096
@@ -961,7 +961,7 @@ def init_l2norm(self):
         if not hasattr(self.config, 'skip_layers'):
             self.config.skip_layers = [0,1]
 
-    self.kv_cluster = L2NormCluster( 
+    self.kv_cluster = L2NormCluster(
         max_capacity_prompt = self.config.max_capacity_prompt,
         layer_idx = self.layer_idx,
         skip_layers = self.config.skip_layers
@@ -977,11 +977,11 @@ def init_CAM(self):
             self.config.kernel_size = 5
         if not hasattr(self.config, 'pooling'):
             self.config.pooling = 'avgpool'
-    
-    
+
+
     self.kv_cluster = CAMKVCluster(
-        window_size = self.config.window_size, 
-        max_capacity_prompt = self.config.max_capacity_prompt, 
+        window_size = self.config.window_size,
+        max_capacity_prompt = self.config.max_capacity_prompt,
         kernel_size = self.config.kernel_size,
         pooling = self.config.pooling,
         merge = self.config.merge,
@@ -999,10 +999,10 @@ def init_H2O(self):
             self.config.pooling = 'avgpool'
         if not hasattr(self.config, 'merge'):
             self.config.merge = None
-    
+
     self.kv_cluster = H2OKVCluster(
-        window_size = self.config.window_size, 
-        max_capacity_prompt = self.config.max_capacity_prompt, 
+        window_size = self.config.window_size,
+        max_capacity_prompt = self.config.max_capacity_prompt,
         kernel_size = self.config.kernel_size,
         pooling = self.config.pooling,
         merge = self.config.merge,
@@ -1020,11 +1020,11 @@ def init_StreamingLLM(self):
             self.config.pooling = 'avgpool'
         if not hasattr(self.config, 'merge'):
             self.config.merge = None
-    
-    
+
+
     self.kv_cluster = StreamingLLMKVCluster(
-        window_size = self.config.window_size, 
-        max_capacity_prompt = self.config.max_capacity_prompt, 
+        window_size = self.config.window_size,
+        max_capacity_prompt = self.config.max_capacity_prompt,
         kernel_size = self.config.kernel_size,
         pooling = self.config.pooling,
         merge = self.config.merge,
@@ -1047,11 +1047,11 @@ def init_adakv(self):
     # max_capacity_prompt --> base_capacity
     # init only once
     if not hasattr(self, "kv_cluster"):
-        self.kv_cluster = AdaKVCluster( 
+        self.kv_cluster = AdaKVCluster(
             num_hidden_layers = self.config.num_hidden_layers,
             layer_idx = self.layer_idx,
-            window_size = self.config.window_size, 
-            max_capacity_prompt = self.config.max_capacity_prompt, 
+            window_size = self.config.window_size,
+            max_capacity_prompt = self.config.max_capacity_prompt,
             kernel_size = self.config.kernel_size,
             pooling = self.config.pooling,
             floor = self.config.floor,
@@ -1074,11 +1074,11 @@ def init_headkv(self):
     # max_capacity_prompt --> base_capacity
     # init only once
     if not hasattr(self, "kv_cluster"):
-        self.kv_cluster = HeadKVCluster( 
+        self.kv_cluster = HeadKVCluster(
             num_hidden_layers = self.config.num_hidden_layers,
             layer_idx = self.layer_idx,
-            window_size = self.config.window_size, 
-            max_capacity_prompt = self.config.max_capacity_prompt, 
+            window_size = self.config.window_size,
+            max_capacity_prompt = self.config.max_capacity_prompt,
             kernel_size = self.config.kernel_size,
             pooling = self.config.pooling,
             head_capacity=self.config.head_capacity

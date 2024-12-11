@@ -1,4 +1,3 @@
-
 results_dir=$1
 
 

@@ -96,19 +96,19 @@ def build_chat(prompt):
         return prompt
 
 # def build_prompt(prompt, dataset):
-    
+
 #     SYSTEM_PROMPT = model2prompt[dataset]
 
 #     prompt = f"<<SYS>>\n {SYSTEM_PROMPT} \n<</SYS>>\n\n{prompt}"
 #     return prompt
 
 def main(args):
-    
+
 
     print("Loading data...")
-    
+
     test_data = []
-    
+
     prompts = []
     inputs = []
     contexts = []
@@ -118,49 +118,49 @@ def main(args):
     languages = []
     all_classess = []
     _ids = []
-    
+
     input_max_len = 0
-    
+
     model_path = args.model_path.lower()
 
-    
+
     for key in model2maxlen:
         if key in model_path:
             model_max_len = model2maxlen[key]
-            
 
-    
+
+
     output_max_len = dataset2maxlen[args.dataset]
-    
+
     with open(args.data_file) as fp:
         for line in fp:
             example = json.loads(line)
-            
-            
+
+
             length = example["length"]
             if length > input_max_len: input_max_len = length
-            
+
             template = model2prompt[args.dataset]
             prompt = template.format(**example)
-            
+
             if "llama2" in args.model_path.lower():
                 prompt = build_chat(prompt)
-                
+
             example["prompt"] = prompt
-                
+
             test_data.append(example)
-        
+
     print(f"Max Length is {input_max_len}")
-        
+
     if args.max_num_examples and len(test_data) > args.max_num_examples:
         if args.sample_method == "random":
             test_data = random.sample(test_data, args.max_num_examples)
         elif args.sample_method == "topk":
             test_data = test_data[:args.max_num_examples]
-    
-    
+
+
     for example in test_data:
-        
+
         prompts.append(example["prompt"])
         inputs.append(example["input"])
         contexts.append(example["context"])
@@ -172,26 +172,26 @@ def main(args):
         _ids.append(example["_id"])
 
     print("Finish loading model and tokenizer")
-    
+
     model_name = model_path.split("/")[-1]
 
     os.makedirs(os.path.join(args.save_dir, f"{model_name}_{args.max_capacity_prompts}", args.dataset), exist_ok=True)
 
     fout = open(os.path.join(args.save_dir, f"{model_name}_{args.max_capacity_prompts}", args.dataset, f"{args.method}.json"), "w")
-     
+
     for i in tqdm(range(0, len(prompts), args.eval_batch_size)):
-        
+
         batch_prompts = prompts[i:i+args.eval_batch_size]
         batch_inputs = inputs[i:i+args.eval_batch_size]
         batch_contexts = contexts[i:i+args.eval_batch_size]
         batch_answerss = answerss[i:i+args.eval_batch_size]
         batch_lengths = lengths[i:i+args.eval_batch_size]
-        
+
         batch_datasets = datasets[i:i+args.eval_batch_size]
         batch_languages = languages[i:i+args.eval_batch_size]
         batch_all_classess = all_classess[i:i+args.eval_batch_size]
         batch__ids = _ids[i:i+args.eval_batch_size]
-        
+
         tokenized_prompts = tokenizer(batch_prompts, padding="longest", return_tensors="pt", add_special_tokens=True).to('cuda')
         batch_input_ids = tokenized_prompts.input_ids
         attention_mask = tokenized_prompts.attention_mask
@@ -199,7 +199,7 @@ def main(args):
         if len(batch_input_ids[0]) > model_max_len:
             half = int(model_max_len/2)
             prompt = tokenizer.decode(batch_input_ids[0][:half], skip_special_tokens=True)+tokenizer.decode(batch_input_ids[0][-half:], skip_special_tokens=True)
-            
+
             tokenized_prompts = tokenizer(prompt, padding="longest", return_tensors="pt", add_special_tokens=True).to('cuda')
             batch_input_ids = tokenized_prompts.input_ids
             attention_mask = tokenized_prompts.attention_mask
@@ -214,8 +214,8 @@ def main(args):
             max_capacity_prompts = args.max_capacity_prompts
         elif args.max_capacity_prompts_ratio != -1:
             max_capacity_prompts = round(batch_input_ids.shape[1] * args.max_capacity_prompts_ratio)
-        
-        
+
+
         if args.method != "FullKV":
             if args.method.lower() in ["snapkv","pyramidkv","h2o","cam", "l2norm", "adakv", "headkv", "think"]:
                 window_sizes = 8
@@ -231,7 +231,7 @@ def main(args):
                 total_pool_capacity = (args.max_capacity_prompts // args.head_beta) * model.config.num_hidden_layers * model.config.num_attention_heads
                 min_num = (args.max_capacity_prompts - args.max_capacity_prompts // args.head_beta)
                 head_capacity = torch.round(total_attention * total_pool_capacity + min_num).int()
-                model.model.config.head_capacity = head_capacity    
+                model.model.config.head_capacity = head_capacity
 
             kernel_sizes = 7
             pooling = "maxpool"
@@ -259,10 +259,10 @@ def main(args):
                 model.model.layers[i].self_attn.config.floor = args.floor
                 model.model.layers[i].self_attn.config.ratio = ratio[i]
                 model.model.layers[i].self_attn.config.recent_size = recent_size[i]
-            
+
 
         context_length = batch_input_ids.shape[-1]
-        if args.quant_method == None:        
+        if args.quant_method == None:
             output = model.generate(
                 **tokenized_prompts,
                 output_attentions = args.output_attentions,
@@ -283,29 +283,29 @@ def main(args):
                 temperature=1.0,
                 min_length=context_length+1,
                 eos_token_id=[tokenizer.eos_token_id],
-                cache_implementation="quantized", 
+                cache_implementation="quantized",
                 cache_config={"nbits": args.nbits, "backend": "HQQ","device":"cuda","residual_length":output_max_len,"axis_key":1,"q_group_size":64},
             )
 
         batch_outputs =tokenizer.batch_decode([output[0][context_length:]], skip_special_tokens=True)
-        
+
         # print(f"debbug batch_outputs {batch_outputs}")
-        
+
         batch_generations = batch_outputs
 
         torch.cuda.empty_cache()
 
         for j in range(args.eval_batch_size):
-            
+
             example = {}
-            
+
             example["prompt"] = batch_prompts[j]
             example["input"] = batch_inputs[j]
             example["context"] = batch_contexts[j]
             example["answers"] = batch_answerss[j]
             example["pred"] = batch_generations[j]
             example["length"] = batch_lengths[j]
-            
+
             example["dataset"] = batch_datasets[j]
             example["language"] = batch_languages[j]
             example["all_classes"] = batch_all_classess[j]
@@ -313,13 +313,13 @@ def main(args):
 
             # print(f'{batch_generations[j]}')
             fout.write(json.dumps(example) + "\n")
-    
-    
+
+
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    
+
     parser.add_argument("--seed", type=int, default=42, help="")
     parser.add_argument("--base_dir", type=str, default="")
     parser.add_argument("--dataset", type=str, default="")
@@ -330,14 +330,14 @@ if __name__ == "__main__":
     parser.add_argument("--model_path", type=str, default=None, help="if specified, we will load the model to generate the predictions.")
     parser.add_argument("--use_fast_tokenizer", type=bool, default=True, help="")
     parser.add_argument("--output_attentions", type=bool, default=False, help="")
-    
+
     parser.add_argument("--max_num_examples", type=int, default=None, help="maximum number of examples to evaluate per task.")
     parser.add_argument("--sample_method", type=str, default="topk", choices=["random", "topk"], help="how to sample the examples.")
-    
+
     parser.add_argument("--max_new_tokens", type=int, default=None, help="")
-    
+
     parser.add_argument("--eval_batch_size", type=int, default=1, help="batch size for evaluation.")
-    
+
     parser.add_argument("--use_cache", type=bool, default=True, help="")
     parser.add_argument("--attn_implementation", type=str,  default="flash_attention_2", choices=["flash_attention_2", "sdpa", "eager"])
     parser.add_argument("--method", type=str,  default=None)
@@ -354,19 +354,19 @@ if __name__ == "__main__":
     parser.add_argument("--pruning_ratio", type=float, default=0.4, help="pruning ratio of Key Cache")
 
     parser.add_argument(
-        "--use_chat_format", 
-        action="store_true", 
+        "--use_chat_format",
+        action="store_true",
         help="If given, we will use the chat format for the prompts."
     )
     parser.add_argument(
-        "--chat_formatting_function", 
-        type=str, 
-        default="eval.templates.create_prompt_with_tulu_chat_format", 
+        "--chat_formatting_function",
+        type=str,
+        default="eval.templates.create_prompt_with_tulu_chat_format",
         help="The function to use to create the chat format. This function will be dynamically imported. Please see examples in `eval/templates.py`."
     )
-    
+
     args = parser.parse_args()
-    
+
     set_seed(args.seed)
     if args.quant_method == "kvquant":
         from pyramidkv.quantcache import KVQuantizedCache
@@ -382,7 +382,7 @@ if __name__ == "__main__":
     from pyramidkv.monkeypatch import replace_llama,replace_mistral
     replace_llama(args.method.lower())
     replace_mistral(args.method.lower())
-    
+
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path,
         torch_dtype=torch.float16,
@@ -391,28 +391,28 @@ if __name__ == "__main__":
         use_cache=args.use_cache,
         attn_implementation=args.attn_implementation
     )
-        
+
 
     tokenizer.padding_side = "left"
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
-    
 
-        
+
+
     model.eval()
-    
+
     save_dir = args.save_dir
-    
-        
+
+
     max_capacity_prompts = args.max_capacity_prompts
-    
+
     for idx, dataset in enumerate(datasets):
-        
+
         print(f"Working on max_capacity_prompts {args.max_capacity_prompts} dataset {dataset} - {idx}/{len(datasets)}")
-        
+
         args.dataset = dataset
-        
+
         args.data_file = f"data/LongBench/{args.dataset}.jsonl"
-        
+
         main(args)
