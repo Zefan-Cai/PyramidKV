@@ -14,7 +14,6 @@ Currently, our project is design to support diverse methods at three stages. Bel
         - Head-Level Budget Allocations (Ada-Snap-KV and HeadKV)
     - KV Cache Quantization (kivi, kvquant)
     - KV Cache Merge (CAM, Look-M)
-    - 
 - Decoding Stage
 - Evaluation (LongBench, Needle-in-a-haystack and ruler)
 
@@ -54,11 +53,6 @@ Currently, our project is design to support diverse methods at three stages. Bel
 
 ## Visualization: Inefficient Attention
 
-The Llama model attention map with 3 documents is represented as follows:
-
-<p align="center">
-    <img src="figs/attention_pattern.png" width="100%"> <br>
-</p>
 
 `./visualization-tools/vis.ipynb` reproduces the visualization results in the paper. We provide more visualization tools under `./visualization` that supports different levels of kv-cache visualization.
 
@@ -69,7 +63,7 @@ Model attention maps for different layers would be stored at `./attention`
 ## Requirements
 
 ```python
-transformers >= 4.41
+transformers >= 4.44
 flash-attn >= 2.4.0.post1
 ```
 
