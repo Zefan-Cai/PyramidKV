@@ -4,6 +4,7 @@
 
 Currently, our project is design to support diverse methods at three stages. Below is the currently supported methods:
 
+- Visualization
 - Prefilling Stage （ [MInference](https://github.com/microsoft/MInference) ![](https://img.shields.io/github/stars/microsoft/MInference.svg?style=social) ）
 - KV Cache Management Stage:
     - KV Cache Eviction
@@ -21,7 +22,6 @@ Currently, our project is design to support diverse methods at three stages. Bel
 
 - [2024-12-07] Currently our project is construed to seperatedly support methods at prefilling stage, KV cache management stage and Decoding State.
 
-- [2024-12-05]
 
 - [2024-11-28] Çhange the name to KVCache-Factory! The target of our project is now a unified framework of KV Cache compression of diverse models.
 
@@ -50,14 +50,6 @@ Currently, our project is design to support diverse methods at three stages. Bel
 - [ ] Support KV cache compression at decoding stage
 
 ## Performence
-
-<p align="center">
-    <img src="figs/Result.png" width="100%"> <br>
-</p>
-
-<p align="center">
-    <img src="figs/Needle.png" width="80%"> <br>
-</p>
 
 
 ## Visualization: Inefficient Attention
