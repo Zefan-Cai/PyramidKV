@@ -1,8 +1,27 @@
 ![# KVCache-Facroty](assets/logo.png)
 
+## Overlook
 
+Currently, our project is design to support diverse methods at three stages. Below is the currently supported methods:
+
+- Prefilling Stage （ [MInference](https://github.com/microsoft/MInference) ![](https://img.shields.io/github/stars/microsoft/MInference.svg?style=social) ）
+- KV Cache Management Stage:
+    - KV Cache Eviction
+        - Selection Features (Attention and [L2-Norm](https://github.com/alessiodevoto/l2compress) ![](https://img.shields.io/github/stars/alessiodevoto/l2compress.svg?style=social))
+        - Unified Compression (H2O, SnapKV and ThinK)
+        - Layer-Level Budget Allocations (PyramidKV)
+        - Head-Level Budget Allocations (Ada-Snap-KV and HeadKV)
+    - KV Cache Quantization (kivi, kvquant)
+    - KV Cache Merge (CAM, Look-M)
+    - 
+- Decoding Stage
+- Evaluation (LongBench, Needle-in-a-haystack and ruler)
 
 ## News
+
+- [2024-12-07] Currently our project is construed to seperatedly support methods at prefilling stage, KV cache management stage and Decoding State.
+
+- [2024-12-05]
 
 - [2024-11-28] Çhange the name to KVCache-Factory! The target of our project is now a unified framework of KV Cache compression of diverse models.
 
